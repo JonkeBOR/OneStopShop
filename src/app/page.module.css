@@ -15,7 +15,12 @@
   font-size: var(--font-size-xl);
 }
 
-.description {
+.features {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: 100%;
   margin: 0;
-  color: var(--color-text-muted);
+  padding: 0;
+  list-style: none;
 }

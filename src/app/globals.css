@@ -6,6 +6,8 @@
   --color-text: #14171c;
   --color-text-muted: #5a6272;
   --color-accent: #2f6df6;
+  --color-on-accent: #ffffff;
+  --color-danger: #c22b3d;
   --color-border: #e3e6ec;
 
   --space-1: 0.25rem;
@@ -35,6 +37,8 @@
     --color-text: #eef0f4;
     --color-text-muted: #99a1b3;
     --color-accent: #6f9bff;
+    --color-on-accent: #0b1220;
+    --color-danger: #ff6b7f;
     --color-border: #2a2f3a;
   }
 }

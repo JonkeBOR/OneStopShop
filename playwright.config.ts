@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+process.loadEnvFile('.env.local');
+
 const baseURL = 'http://localhost:3000';
 
 export default defineConfig({
@@ -16,5 +18,6 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: true,
     timeout: 120_000,
+    env: { E2E_STUB_GOOGLE_SHEETS: '1' },
   },
 });

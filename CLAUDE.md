@@ -20,17 +20,39 @@ is non-negotiable. Cross-cutting architecture decisions are recorded in
 
 ## Project state
 
-The application foundation exists: Next.js 16 App Router under `src/`, a single landing page at
-`/`, design tokens plus a dark-mode re-declaration in `src/app/globals.css`, CSS Modules beside the
-code that uses them, user-facing text in `src/lib/strings/`, and a typed `src/app/manifest.ts` with
-icons and iOS metadata so the app installs to the Home Screen and launches in standalone mode.
+The app foundation feature (`specs/001-app-foundation/`) is implemented. Google OAuth sign-in
+(authorization code + PKCE, identity only) establishes an encrypted, `HttpOnly` application session
+cookie in `src/lib/server/session.ts`; `src/proxy.ts` gives signed-out visitors a coarse redirect to
+`/sign-in`, and `src/lib/server/current-user.ts`'s `requireOwner()` /
+`requireOwnerFromRequest()` is the real authorization gate every Server Component read and route
+handler calls. The spreadsheet is reached independently, as a Google **service account**
+(`src/lib/server/store-access-token.ts`, `src/lib/server/sheets-collection.ts`), through the
+storage-agnostic `Collection<T>` port in `src/lib/server/collection.ts` — no Google credential of
+any kind reaches the browser.
 
-Testing exists: Vitest for unit tests colocated as `src/**/*.test.tsx`, Playwright for end-to-end
-tests in `e2e/`, and a Playwright MCP browser configured in `.mcp.json`.
+`src/lib/features.ts` is the landing-page feature registry (one entry today, `fitness-tracker`),
+rendered by `src/components/feature-card/FeatureCard.tsx`. `src/features/fitness-tracker/` holds
+that feature's domain type and validation (`bodyweight.ts`), its store binding
+(`bodyweight-store.ts`), and its two components — `BodyweightHistory` (server-rendered) and
+`BodyweightForm` (the only `'use client'` leaf in the app). `src/app/api/auth/` and
+`src/app/api/bodyweight/route.ts` are the route handlers; every one of them is a plain function over
+Web `Request`/`Response` so it unit-tests in Vitest without a server, per
+[003-development-workflow.md](docs/architecture/003-development-workflow.md).
 
-Not built yet: Google OAuth, the application session cookie, `src/lib/server/`, Google Sheets
-access, any `/api/*` route handler, `src/components/`, `src/features/`, CI, and a chosen hosting
-provider. Those directories are created when they have a real occupant, not before.
+Design tokens live in `src/app/globals.css`, CSS Modules sit beside the code that uses them, and
+user-facing text is in `src/lib/strings/`. `src/instrumentation.ts` monkey-patches `global.fetch` to
+stub Google's token/Sheets endpoints, but only when `E2E_STUB_GOOGLE_SHEETS=1` — set by Playwright's
+`webServer`, so `e2e/bodyweight.spec.ts` needs no live spreadsheet and production code is untouched.
+
+Testing: Vitest for unit tests colocated as `src/**/*.test.ts(x)`, one Playwright acceptance spec
+per user story in `e2e/` (`sign-in`, `landing-navigation`, `bodyweight`), and a Playwright MCP
+browser configured in `.mcp.json`.
+
+Not built yet: CI, and a chosen hosting provider (see `docs/architecture/` once decided — it is the
+blocker for closing research.md's R9, the open question about OAuth redirects from an installed,
+standalone iPhone PWA, which needs a real device against a real HTTPS origin and cannot be closed
+from this environment). `.env.local` needs real Google credentials before sign-in or the spreadsheet
+will work for real; see `README.md`.
 
 ## Commands
 
