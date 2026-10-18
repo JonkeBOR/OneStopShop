@@ -82,6 +82,20 @@ temporary trigger drops it in `finally`. `storage-test-support.ts` has `expectOk
 Never run two Vitest invocations at once: the setup wipes `.wrangler/test-state` at the start of
 each run. See `docs/architecture/006-domain-persistence.md`.
 
+### Stop the dev server first
+
+A dev server running on http://localhost:3000 makes storage runs fail intermittently with
+`Failed query: …` on tests the change never touched, and a re-run then passes. Before running the
+storage project or `check.ps1`, stop it:
+
+    $listener = (Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue).OwningProcess | Select-Object -First 1
+    if ($listener) { taskkill /PID $listener /T /F }
+    Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue
+
+The last line must print nothing. Tell the user the dev server was stopped so they can restart it
+with `npm run dev`. This applies to Vitest only; `e2e.ps1` needs a dev server and reuses a running
+one.
+
 ### EADDRINUSE on Windows
 
 Two storage runs within about two minutes of each other fail dozens of tests with `Failed query: …`

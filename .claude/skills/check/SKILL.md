@@ -81,7 +81,8 @@ The test stage includes the `storage` project, which starts a local D1 and takes
 longer than the other stages. To iterate on one file, use
 `npx vitest run --project storage <path>` rather than the whole gate, and run the gate before
 finishing. Two Vitest runs must not overlap: the storage setup wipes `.wrangler/test-state` at the
-start of every run.
+start of every run. Stop a dev server running on port 3000 before running the gate. It makes storage
+tests fail intermittently. The `test` skill has the command, under "Stop the dev server first".
 
 ## Which to run when
 
