@@ -187,8 +187,12 @@ export const fitnessStrings = {
     noWorkouts: 'This program has no workouts.',
   },
   session: {
-    heading: (workoutName: string, blockNumber: number | null) =>
-      blockNumber === null ? workoutName : `${workoutName} · Block ${blockNumber}`,
+    heading: (workoutName: string, block: { number: number | null; label: string | null }) => {
+      if (block.label !== null) {
+        return `${workoutName} · ${block.label}`;
+      }
+      return block.number === null ? workoutName : `${workoutName} · Block ${block.number}`;
+    },
     weightLabel: (setNumber: number, exerciseName?: string) =>
       exerciseName === undefined
         ? `Weight, set ${setNumber}`

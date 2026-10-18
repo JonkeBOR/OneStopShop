@@ -17,7 +17,7 @@ export function WorkoutSessionScreen({ session }: WorkoutSessionScreenProps) {
 
   return (
     <Screen
-      title={fitnessStrings.session.heading(session.workout.name, session.block.number)}
+      title={fitnessStrings.session.heading(session.workout.name, session.block)}
       back={{ href: '/fitness-tracker/active/block', label: fitnessStrings.navigation.toBlock }}
       action={
         <FinishWorkoutButton

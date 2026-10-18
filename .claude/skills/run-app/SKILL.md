@@ -16,7 +16,9 @@ launcher - they never build or serve the app.
     npm run dev
 
 `next dev` with Turbopack on http://localhost:3000. Leave it running; Turbopack hot-reloads edits,
-so an edit does not need a restart.
+so an edit does not need a restart. The exception is Vitest: stop it before `check.ps1` or any
+storage test run, because it makes storage tests fail intermittently. The `test` skill, under
+"Stop the dev server first", has the command.
 
 ## Production build
 
