@@ -118,12 +118,20 @@ describe('WorkoutSessionScreen', () => {
       .map((cell) => cell.textContent);
   }
 
-  it('shows the workout name with the block', () => {
+  it('shows the workout name with the block name', () => {
+    render(
+      <WorkoutSessionScreen
+        session={freshSession({ block: { id: 'b2', number: 2, label: 'Hypertrophy' } })}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Day 1 · Hypertrophy' })).toBeDefined();
+  });
+
+  it('shows the workout name with the block number when the block has no name', () => {
     render(<WorkoutSessionScreen session={freshSession()} />);
 
-    expect(
-      screen.getByRole('heading', { level: 1, name: fitnessStrings.session.heading('Day 1', 2) }),
-    ).toBeDefined();
+    expect(screen.getByRole('heading', { level: 1, name: 'Day 1 · Block 2' })).toBeDefined();
     expect(
       screen.getByRole('link', { name: fitnessStrings.navigation.toBlock }).getAttribute('href'),
     ).toBe('/fitness-tracker/active/block');
