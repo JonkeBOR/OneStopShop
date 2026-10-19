@@ -231,6 +231,7 @@ describe('exercise usage', () => {
       exercise,
       slots: [],
       hasSetLogs: false,
+      bodyParts: [],
     });
   });
 

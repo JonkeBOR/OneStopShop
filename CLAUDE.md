@@ -41,13 +41,14 @@ the fitness tracker at `/fitness-tracker` is the app's first feature. `wrangler.
 and the D1 binding. See
 [004-hosting-and-persistence.md](docs/architecture/004-hosting-and-persistence.md).
 
-The fitness tracker is built end to end. The domain is Drizzle ORM with an eleven-table schema in
+The fitness tracker is built end to end. The domain is Drizzle ORM with a thirteen-table schema in
 `src/features/fitness-tracker/server/schema.ts`, migrations generated into `migrations/`, pure rules
 in `src/features/fitness-tracker/domain/`, and server-only operations in
 `src/features/fitness-tracker/server/` that take a `Database` from `src/lib/server/database.ts` as
 their first argument. Its screens are under `src/app/fitness-tracker/`: home with the daily weigh-in,
 the active program and its current block, the workout session, programs, program, workout and slot
-editing, and the exercise catalog. Pages read through the operations in Server Components. Writes go
+editing, and the exercise catalog, where an exercise's muscles are marked on an anatomy chart
+(`AnatomyChart`, seeded `body_parts`). Pages read through the operations in Server Components. Writes go
 through JSON route handlers under `src/app/api/fitness/`, each a plain function in
 `src/features/fitness-tracker/server/handlers/` wrapped by `fitnessRoute`. Shared client pieces are in
 `src/features/fitness-tracker/components/`, and all text is in `src/lib/strings/fitness.ts`. A

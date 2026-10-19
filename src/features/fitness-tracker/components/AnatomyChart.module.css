@@ -1,0 +1,40 @@
+.chart {
+  display: block;
+  width: 100%;
+  max-inline-size: 30rem;
+  margin-inline: auto;
+}
+
+.body {
+  fill: var(--color-anatomy-body);
+}
+
+.detail {
+  fill: var(--color-anatomy-detail);
+}
+
+.shade {
+  fill: var(--color-anatomy-shade);
+}
+
+.muscle {
+  fill: var(--color-anatomy-muscle);
+  transition: fill 120ms ease-out;
+}
+
+.selected {
+  fill: var(--color-anatomy-selected);
+}
+
+.interactive .muscle {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.interactive .muscle:focus {
+  outline: none;
+}
+
+.interactive .muscle:focus-visible {
+  outline: 1px solid var(--color-accent);
+}

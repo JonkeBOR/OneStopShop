@@ -244,6 +244,12 @@ export const fitnessStrings = {
     delete: 'Delete exercise',
     deleteConfirmLabel: 'Delete',
     deleteConfirm: 'Delete this exercise?',
+    musclesHeading: 'Muscles worked',
+  },
+  anatomy: {
+    chartLabel: 'Anatomy chart',
+    summary: (names: readonly string[]) =>
+      names.length === 0 ? 'No muscles marked' : `Muscles worked: ${names.join(', ')}`,
   },
 } as const;
 

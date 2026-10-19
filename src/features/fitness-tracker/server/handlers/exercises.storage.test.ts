@@ -1,9 +1,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { addExercise, listExercises } from '../exercises';
+import { addExercise, getExerciseUsage, listExercises } from '../exercises';
 import { ensureProfile } from '../profile';
 import { openTestDatabase, type TestDatabase } from '../storage-test-database';
 import { createProgramFromSpec, expectOk } from '../storage-test-support';
-import { handleAddExercise, handleDeleteExercise, handleUpdateExercise } from './exercises';
+import {
+  handleAddExercise,
+  handleDeleteExercise,
+  handleLinkBodyPart,
+  handleUnlinkBodyPart,
+  handleUpdateExercise,
+} from './exercises';
 import { handlerContext, jsonOf } from './handler-test-support';
 
 describe('exercise handlers', () => {
@@ -175,6 +181,53 @@ describe('exercise handlers', () => {
           params: { id: dips.id },
         }),
       );
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe('body parts', () => {
+    function link(id: string, bodyPart: string) {
+      return handleLinkBodyPart(
+        handlerContext({ db: testDatabase.db, profileId, now, params: { id, bodyPart } }),
+      );
+    }
+
+    function unlink(id: string, bodyPart: string) {
+      return handleUnlinkBodyPart(
+        handlerContext({ db: testDatabase.db, profileId, now, params: { id, bodyPart } }),
+      );
+    }
+
+    async function bodyPartsOf(id: string) {
+      return expectOk(await getExerciseUsage(testDatabase.db, profileId, id)).bodyParts;
+    }
+
+    it('links and unlinks a body part, answering an empty body each time', async () => {
+      const press = expectOk(await addExercise(testDatabase.db, profileId, { name: 'Press' }, now));
+
+      const linked = await link(press.id, 'front-delts');
+      expect(linked.status).toBe(200);
+      expect(await jsonOf(linked)).toEqual({});
+      expect(await bodyPartsOf(press.id)).toEqual(['front-delts']);
+
+      const unlinked = await unlink(press.id, 'front-delts');
+      expect(unlinked.status).toBe(200);
+      expect(await jsonOf(unlinked)).toEqual({});
+      expect(await bodyPartsOf(press.id)).toEqual([]);
+    });
+
+    it('answers 404 for a body part that is not on the chart', async () => {
+      const press = expectOk(await addExercise(testDatabase.db, profileId, { name: 'Press' }, now));
+
+      for (const response of [await link(press.id, 'neck'), await unlink(press.id, 'neck')]) {
+        expect(response.status).toBe(404);
+        expect(await jsonOf(response)).toEqual({ error: 'not-found' });
+      }
+    });
+
+    it('answers 404 for an exercise that does not exist', async () => {
+      const response = await link(crypto.randomUUID(), 'chest');
 
       expect(response.status).toBe(404);
     });

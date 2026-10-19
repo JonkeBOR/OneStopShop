@@ -3,10 +3,12 @@ import {
   type AnySQLiteColumn,
   index,
   integer,
+  primaryKey,
   sqliteTable,
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
+import { bodyPartIds } from '../domain/body-part';
 
 export const sessionStatuses = ['in_progress', 'finished'] as const;
 
@@ -32,6 +34,24 @@ export const exercises = sqliteTable(
     createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [uniqueIndex('exercises_profile_name_key').on(table.profileId, table.nameKey)],
+);
+
+export const bodyParts = sqliteTable('body_parts', {
+  id: text('id', { enum: bodyPartIds }).primaryKey(),
+  name: text('name').notNull(),
+});
+
+export const exerciseBodyParts = sqliteTable(
+  'exercise_body_parts',
+  {
+    exerciseId: text('exercise_id')
+      .notNull()
+      .references(() => exercises.id, { onDelete: 'cascade' }),
+    bodyPartId: text('body_part_id', { enum: bodyPartIds })
+      .notNull()
+      .references(() => bodyParts.id, { onDelete: 'restrict' }),
+  },
+  (table) => [primaryKey({ columns: [table.exerciseId, table.bodyPartId] })],
 );
 
 export const programs = sqliteTable('programs', {
