@@ -32,7 +32,7 @@ export function ExerciseEditScreen({ usage, bodyParts }: ExerciseEditScreenProps
         <h2 id={musclesHeadingId} className={styles.heading}>
           {fitnessStrings.exerciseEdit.musclesHeading}
         </h2>
-        <BodyPartEditor exerciseId={exercise.id} bodyParts={bodyParts} selected={usage.bodyParts} />
+        <BodyPartEditor exerciseId={exercise.id} bodyParts={bodyParts} links={usage.bodyParts} />
       </section>
       <section className={styles.section}>
         <h2 id={usedInHeadingId} className={styles.heading}>

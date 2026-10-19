@@ -9,7 +9,7 @@ import {
 } from '../exercises';
 import type { FitnessRequestContext } from '../fitness-route';
 import { hasKey, readBoolean, readJson, readString, respond, respondEmpty } from '../http';
-import { isBodyPart } from '../../domain/body-part';
+import { isBodyPart, isBodyPartRole } from '../../domain/body-part';
 import { fail } from '../../domain/result';
 
 export async function handleAddExercise({
@@ -72,13 +72,22 @@ export async function handleDeleteExercise({
 export async function handleLinkBodyPart({
   db,
   profileId,
+  request,
   params,
 }: FitnessRequestContext): Promise<Response> {
   const bodyPart = params.bodyPart;
   if (!isBodyPart(bodyPart)) {
     return respond(fail('not-found'));
   }
-  return respondEmpty(await linkBodyPart(db, profileId, params.id ?? '', bodyPart));
+  const body = await readJson(request);
+  if (!body.ok) {
+    return respond(body);
+  }
+  const role = body.value.role;
+  if (!isBodyPartRole(role)) {
+    return respond(fail('invalid-body'));
+  }
+  return respondEmpty(await linkBodyPart(db, profileId, params.id ?? '', bodyPart, role));
 }
 
 export async function handleUnlinkBodyPart({

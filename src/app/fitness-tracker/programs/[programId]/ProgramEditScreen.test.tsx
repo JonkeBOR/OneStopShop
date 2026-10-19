@@ -1,8 +1,15 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { programFixture } from '@/features/fitness-tracker/components/test-fixtures';
+import { bodyPartIds } from '@/features/fitness-tracker/domain/body-part';
+import type { BodyPartView } from '@/features/fitness-tracker/domain/types';
 import { fitnessErrorStrings, fitnessStrings } from '@/lib/strings/fitness';
 import { ProgramEditScreen } from './ProgramEditScreen';
+
+const bodyParts: BodyPartView[] = bodyPartIds.map((id) => ({
+  id,
+  name: id === 'chest' ? 'Chest' : `Name of ${id}`,
+}));
 
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 
@@ -37,10 +44,62 @@ describe('ProgramEditScreen', () => {
         program={programFixture()}
         otherActiveProgramName={null}
         inProgressWorkoutIds={[]}
+        bodyPartLinks={new Map()}
+        bodyParts={bodyParts}
         {...overrides}
       />,
     );
   }
+
+  describe('weekly volume', () => {
+    function volumeRegion() {
+      return screen.getByRole('region', { name: 'Weekly volume' });
+    }
+
+    function highlightOf(part: string) {
+      return (
+        volumeRegion().querySelector(`[data-muscle="${part}"]`)?.getAttribute('data-highlight') ??
+        null
+      );
+    }
+
+    it('sits between blocks and workouts and colours the current block without optional slots', () => {
+      renderScreen({
+        bodyPartLinks: new Map([
+          ['e1', [{ bodyPart: 'chest', role: 'primary' }]],
+          ['e2', [{ bodyPart: 'biceps', role: 'primary' }]],
+        ]),
+      });
+
+      const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+      expect(headings).toEqual([
+        fitnessStrings.programEdit.blocksTitle,
+        'Weekly volume',
+        fitnessStrings.programEdit.workoutsTitle,
+      ]);
+      expect(highlightOf('chest')).toBe('low');
+      expect(highlightOf('biceps')).toBeNull();
+    });
+
+    it('shows the chart and its legend without a list of sets', () => {
+      renderScreen({ bodyPartLinks: new Map([['e1', [{ bodyPart: 'chest', role: 'primary' }]]]) });
+
+      expect(within(volumeRegion()).getAllByRole('list')).toHaveLength(1);
+      expect(within(volumeRegion()).queryByText(/sets/)).toBeNull();
+    });
+
+    it('leaves every muscle plain when no exercise is linked', () => {
+      renderScreen();
+
+      expect(volumeRegion().querySelectorAll('[data-highlight]')).toHaveLength(0);
+    });
+
+    it('is left out when the program has no workouts', () => {
+      renderScreen({ program: programFixture({ workouts: [] }) });
+
+      expect(screen.queryByRole('region', { name: 'Weekly volume' })).toBeNull();
+    });
+  });
 
   it('shows the program name as the heading with a rename form, and links back to Programs', () => {
     renderScreen();

@@ -5,6 +5,16 @@ import type { BodyPartView, ExerciseUsage } from '@/features/fitness-tracker/dom
 import { fitnessErrorStrings, fitnessStrings } from '@/lib/strings/fitness';
 import { ExerciseEditScreen } from './ExerciseEditScreen';
 
+function descriptionOf(element: Element): string | null {
+  const ids = element.getAttribute('aria-describedby');
+  return ids === null
+    ? null
+    : ids
+        .split(' ')
+        .map((id) => document.getElementById(id)?.textContent ?? '')
+        .join(' ');
+}
+
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
@@ -17,7 +27,7 @@ function usage(overrides: Partial<ExerciseUsage> = {}): ExerciseUsage {
       { programId: 'p2', programName: 'Cut', workoutId: 'w9', workoutName: 'Full body' },
     ],
     hasSetLogs: true,
-    bodyParts: ['chest'],
+    bodyParts: [{ bodyPart: 'chest', role: 'primary' }],
     ...overrides,
   };
 }
@@ -172,21 +182,33 @@ describe('ExerciseEditScreen', () => {
       expect(muscle('Name of triceps').getAttribute('aria-checked')).toBe('false');
     });
 
-    it('links a muscle on the first tap and unlinks it on the second, without a refresh', async () => {
+    it('cycles a muscle through primary, secondary and off, without a refresh', async () => {
       render(<ExerciseEditScreen bodyParts={bodyParts} usage={usage()} />);
+      const url = '/api/fitness/exercises/e1/body-parts/triceps';
+      const settled = () =>
+        waitFor(() => expect(muscle('Name of triceps').getAttribute('aria-busy')).toBeNull());
 
       fireEvent.click(muscle('Name of triceps'));
       expect(muscle('Name of triceps').getAttribute('aria-checked')).toBe('true');
-      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-      expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/fitness/exercises/e1/body-parts/triceps');
-      expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('PUT');
+      expect(descriptionOf(muscle('Name of triceps'))).toBe(fitnessStrings.anatomy.roles.primary);
+      await settled();
 
-      await waitFor(() => expect(muscle('Name of triceps').getAttribute('aria-busy')).toBeNull());
+      fireEvent.click(muscle('Name of triceps'));
+      expect(descriptionOf(muscle('Name of triceps'))).toBe(fitnessStrings.anatomy.roles.secondary);
+      await settled();
+
       fireEvent.click(muscle('Name of triceps'));
       expect(muscle('Name of triceps').getAttribute('aria-checked')).toBe('false');
-      await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-      expect(fetchMock.mock.calls[1]?.[0]).toBe('/api/fitness/exercises/e1/body-parts/triceps');
-      expect(fetchMock.mock.calls[1]?.[1]?.method).toBe('DELETE');
+      expect(descriptionOf(muscle('Name of triceps'))).toBeNull();
+      await settled();
+
+      expect(
+        fetchMock.mock.calls.map(([target, init]) => [target, init?.method, init?.body]),
+      ).toEqual([
+        [url, 'PUT', JSON.stringify({ role: 'primary' })],
+        [url, 'PUT', JSON.stringify({ role: 'secondary' })],
+        [url, 'DELETE', undefined],
+      ]);
       expect(router.refresh).not.toHaveBeenCalled();
     });
 
@@ -215,15 +237,27 @@ describe('ExerciseEditScreen', () => {
       await waitFor(() => expect(muscle('Name of lats').getAttribute('aria-busy')).toBeNull());
     });
 
-    it('puts a muscle back and explains when saving it fails', async () => {
+    it('returns a muscle to primary and explains when saving secondary fails', async () => {
       fetchMock.mockResolvedValue(Response.json({ error: 'not-found' }, { status: 404 }));
       render(<ExerciseEditScreen bodyParts={bodyParts} usage={usage()} />);
 
       fireEvent.click(muscle('Name of chest'));
-      expect(muscle('Name of chest').getAttribute('aria-checked')).toBe('false');
+      expect(descriptionOf(muscle('Name of chest'))).toBe(fitnessStrings.anatomy.roles.secondary);
 
       expect(await screen.findByText(fitnessErrorStrings['not-found'])).toBeDefined();
       expect(muscle('Name of chest').getAttribute('aria-checked')).toBe('true');
+      expect(descriptionOf(muscle('Name of chest'))).toBe(fitnessStrings.anatomy.roles.primary);
+    });
+
+    it('puts a muscle back to off and explains when linking it fails', async () => {
+      fetchMock.mockResolvedValue(Response.json({ error: 'not-found' }, { status: 404 }));
+      render(<ExerciseEditScreen bodyParts={bodyParts} usage={usage()} />);
+
+      fireEvent.click(muscle('Name of lats'));
+      expect(muscle('Name of lats').getAttribute('aria-checked')).toBe('true');
+
+      expect(await screen.findByText(fitnessErrorStrings['not-found'])).toBeDefined();
+      expect(muscle('Name of lats').getAttribute('aria-checked')).toBe('false');
     });
   });
 });

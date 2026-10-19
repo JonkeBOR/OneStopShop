@@ -12,3 +12,4 @@ blob-report/
 .open-next/
 .wrangler/
 migrations/meta/
+.superpowers/

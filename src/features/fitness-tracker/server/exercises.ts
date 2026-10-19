@@ -196,7 +196,7 @@ export async function getExerciseUsage(
       .where(and(eq(setLogs.profileId, profileId), eq(setLogs.exerciseId, exerciseId)))
       .limit(1),
     db
-      .select({ bodyPartId: exerciseBodyParts.bodyPartId })
+      .select({ bodyPart: exerciseBodyParts.bodyPartId, role: exerciseBodyParts.role })
       .from(exerciseBodyParts)
       .where(eq(exerciseBodyParts.exerciseId, exerciseId)),
   ]);
@@ -209,9 +209,6 @@ export async function getExerciseUsage(
       workoutName,
     })),
     hasSetLogs: log !== undefined,
-    bodyParts: inChartOrder(
-      links.map((link) => link.bodyPartId),
-      (bodyPart) => bodyPart,
-    ),
+    bodyParts: inChartOrder(links, (link) => link.bodyPart),
   });
 }

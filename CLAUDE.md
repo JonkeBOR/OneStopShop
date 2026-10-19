@@ -54,9 +54,15 @@ through JSON route handlers under `src/app/api/fitness/`, each a plain function 
 `src/features/fitness-tracker/components/`, and all text is in `src/lib/strings/fitness.ts`. A
 program has one cycle that only records where the user is (the current block and a pass counter), and
 history lives in the set logs. An exercise slot is periodized, with its own scheme and last weights in each
-block, or not, with one scheme whose last weights carry from block to block. See
-[006-domain-persistence.md](docs/architecture/006-domain-persistence.md) and
-[007-cycle-as-container-and-bff.md](docs/architecture/007-cycle-as-container-and-bff.md).
+block, or not, with one scheme whose last weights carry from block to block. Each exercise–body part
+link is primary or secondary; taps on the exercise chart cycle off → primary → secondary → off. The
+program screen shows a weekly volume estimate per body part for a chosen block — sets weighted 1 for
+primary and 0.5 for secondary, optional exercises left out, coloured by fixed 10/20 bands — as a
+read-only `AnatomyChart` with a legend. The chart takes highlights, an optional legend and
+an optional label, and knows nothing about volume. See
+[006-domain-persistence.md](docs/architecture/006-domain-persistence.md),
+[007-cycle-as-container-and-bff.md](docs/architecture/007-cycle-as-container-and-bff.md) and
+[008-weekly-volume-estimate.md](docs/architecture/008-weekly-volume-estimate.md).
 
 Deployment is continuous: `.github/workflows/deploy.yml` runs the gate, the remote D1 migrations
 and the OpenNext build and deploy on every push to `main`. Merging is deploying. There is no local

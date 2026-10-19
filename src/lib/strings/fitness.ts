@@ -250,6 +250,13 @@ export const fitnessStrings = {
     chartLabel: 'Anatomy chart',
     summary: (names: readonly string[]) =>
       names.length === 0 ? 'No muscles marked' : `Muscles worked: ${names.join(', ')}`,
+    roles: { primary: 'Primary', secondary: 'Secondary' },
+  },
+  programVolume: {
+    heading: 'Weekly volume',
+    blockLabel: 'Block',
+    chartLabel: (blockTitle: string) => `Weekly volume, ${blockTitle}`,
+    levels: { none: 'None', low: 'Low', target: 'On target', high: 'High' },
   },
 } as const;
 

@@ -1,4 +1,8 @@
 import { notFound } from 'next/navigation';
+import {
+  listBodyParts,
+  listProgramBodyPartLinks,
+} from '@/features/fitness-tracker/server/body-parts';
 import { requireFitnessContext } from '@/features/fitness-tracker/server/page-context';
 import { getProgram, listPrograms } from '@/features/fitness-tracker/server/programs';
 import { getTrainingOverview } from '@/features/fitness-tracker/server/training';
@@ -13,9 +17,11 @@ export default async function ProgramEditPage({ params }: ProgramEditPageProps) 
   if (!program.ok) {
     notFound();
   }
-  const [summaries, overview] = await Promise.all([
+  const [summaries, overview, bodyPartLinks, bodyParts] = await Promise.all([
     listPrograms(db, profileId),
     program.value.isActive ? getTrainingOverview(db, profileId) : Promise.resolve(null),
+    listProgramBodyPartLinks(db, profileId, programId),
+    listBodyParts(db),
   ]);
   return (
     <ProgramEditScreen
@@ -30,6 +36,8 @@ export default async function ProgramEditPage({ params }: ProgramEditPageProps) 
           .filter((workout) => workout.status === 'in-progress')
           .map((workout) => workout.id) ?? []
       }
+      bodyPartLinks={bodyPartLinks}
+      bodyParts={bodyParts}
     />
   );
 }

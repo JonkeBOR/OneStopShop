@@ -187,10 +187,14 @@ describe('exercise handlers', () => {
   });
 
   describe('body parts', () => {
-    function link(id: string, bodyPart: string) {
+    function linkWith(body: unknown, id: string, bodyPart: string) {
       return handleLinkBodyPart(
-        handlerContext({ db: testDatabase.db, profileId, now, params: { id, bodyPart } }),
+        handlerContext({ db: testDatabase.db, profileId, now, body, params: { id, bodyPart } }),
       );
+    }
+
+    function link(id: string, bodyPart: string) {
+      return linkWith({ role: 'primary' }, id, bodyPart);
     }
 
     function unlink(id: string, bodyPart: string) {
@@ -209,11 +213,31 @@ describe('exercise handlers', () => {
       const linked = await link(press.id, 'front-delts');
       expect(linked.status).toBe(200);
       expect(await jsonOf(linked)).toEqual({});
-      expect(await bodyPartsOf(press.id)).toEqual(['front-delts']);
+      expect(await bodyPartsOf(press.id)).toEqual([{ bodyPart: 'front-delts', role: 'primary' }]);
 
       const unlinked = await unlink(press.id, 'front-delts');
       expect(unlinked.status).toBe(200);
       expect(await jsonOf(unlinked)).toEqual({});
+      expect(await bodyPartsOf(press.id)).toEqual([]);
+    });
+
+    it('links a body part with the role it is given', async () => {
+      const press = expectOk(await addExercise(testDatabase.db, profileId, { name: 'Press' }, now));
+
+      const response = await linkWith({ role: 'secondary' }, press.id, 'triceps');
+
+      expect(response.status).toBe(200);
+      expect(await bodyPartsOf(press.id)).toEqual([{ bodyPart: 'triceps', role: 'secondary' }]);
+    });
+
+    it('answers 400 invalid-body when the role is missing or not a role', async () => {
+      const press = expectOk(await addExercise(testDatabase.db, profileId, { name: 'Press' }, now));
+
+      for (const body of [undefined, {}, { role: 'tertiary' }, { role: 1 }]) {
+        const response = await linkWith(body, press.id, 'chest');
+        expect(response.status).toBe(400);
+        expect(await jsonOf(response)).toEqual({ error: 'invalid-body' });
+      }
       expect(await bodyPartsOf(press.id)).toEqual([]);
     });
 

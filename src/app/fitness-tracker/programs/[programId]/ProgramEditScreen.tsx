@@ -4,10 +4,13 @@ import { AddLink } from '@/features/fitness-tracker/components/AddLink';
 import { BlockRow } from '@/features/fitness-tracker/components/BlockRow';
 import { DeleteProgramButton } from '@/features/fitness-tracker/components/DeleteProgramButton';
 import { PauseButton } from '@/features/fitness-tracker/components/PauseButton';
+import { ProgramVolume } from '@/features/fitness-tracker/components/ProgramVolume';
 import { RenameForm } from '@/features/fitness-tracker/components/RenameForm';
 import { Screen } from '@/features/fitness-tracker/components/Screen';
 import { WorkoutList } from '@/features/fitness-tracker/components/WorkoutList';
-import type { BlockView, Program } from '@/features/fitness-tracker/domain/types';
+import type { BodyPartLink } from '@/features/fitness-tracker/domain/body-part';
+import type { BlockView, BodyPartView, Program } from '@/features/fitness-tracker/domain/types';
+import { weeklyVolume } from '@/features/fitness-tracker/domain/volume';
 import Link from 'next/link';
 import { fitnessStrings } from '@/lib/strings/fitness';
 import styles from './ProgramEditScreen.module.css';
@@ -16,10 +19,13 @@ type ProgramEditScreenProps = {
   program: Program;
   otherActiveProgramName: string | null;
   inProgressWorkoutIds: readonly string[];
+  bodyPartLinks: ReadonlyMap<string, readonly BodyPartLink[]>;
+  bodyParts: readonly BodyPartView[];
 };
 
 const blocksHeadingId = 'program-blocks-heading';
 const workoutsHeadingId = 'program-workouts-heading';
+const volumeHeadingId = 'program-volume-heading';
 
 function blockRemoveMessage(program: Program, block: BlockView, index: number): string {
   if (block.id !== program.cycle.currentBlockId) {
@@ -45,7 +51,14 @@ export function ProgramEditScreen({
   program,
   otherActiveProgramName,
   inProgressWorkoutIds,
+  bodyPartLinks,
+  bodyParts,
 }: ProgramEditScreenProps) {
+  const volumes = program.blocks.map((block) => ({
+    block,
+    sets: weeklyVolume(program.workouts, block.id, bodyPartLinks),
+  }));
+
   return (
     <Screen
       title={program.name}
@@ -95,6 +108,19 @@ export function ProgramEditScreen({
           body={{}}
         />
       </section>
+
+      {program.workouts.length > 0 ? (
+        <section className={styles.section} aria-labelledby={volumeHeadingId}>
+          <h2 id={volumeHeadingId} className={styles.heading}>
+            {fitnessStrings.programVolume.heading}
+          </h2>
+          <ProgramVolume
+            volumes={volumes}
+            bodyParts={bodyParts}
+            currentBlockId={program.cycle.currentBlockId}
+          />
+        </section>
+      ) : null}
 
       <section className={styles.section}>
         <div className={styles.headingRow}>
