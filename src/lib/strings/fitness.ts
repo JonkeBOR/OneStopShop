@@ -211,6 +211,7 @@ export const fitnessStrings = {
     finishEmptyConfirmLabel: 'Finish',
     finishEmptyConfirm: 'Finish without logging any sets?',
     nothingToLog: 'There is nothing to log in this workout.',
+    variantLabel: (exerciseName: string) => `Variant, ${exerciseName}`,
   },
   finished: {
     affirmations: [
@@ -245,6 +246,18 @@ export const fitnessStrings = {
     deleteConfirmLabel: 'Delete',
     deleteConfirm: 'Delete this exercise?',
     musclesHeading: 'Muscles worked',
+    variants: {
+      heading: 'Variants',
+      empty: 'No variants. Add one for each gym or machine whose weights differ.',
+      nameLabel: 'New variant name',
+      add: 'Add variant',
+      firstConfirm:
+        'The last weights already recorded for this exercise will move to this variant.',
+      firstConfirmLabel: 'Move weights',
+      remove: (name: string) => `Remove ${name}`,
+      removeConfirm: 'Last weights for this variant will be deleted.',
+      removeConfirmLabel: 'Remove',
+    },
   },
   anatomy: {
     chartLabel: 'Anatomy chart',
