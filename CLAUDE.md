@@ -58,7 +58,7 @@ block, or not, with one scheme whose last weights carry from block to block. Eac
 link is primary or secondary; taps on the exercise chart cycle off → primary → secondary → off. The
 program screen shows a weekly volume estimate per body part for a chosen block — sets weighted 1 for
 primary and 0.5 for secondary, optional exercises left out, coloured by fixed 10/20 bands — as a
-read-only `AnatomyChart` with a legend and a list. The chart takes highlights, an optional legend and
+read-only `AnatomyChart` with a legend. The chart takes highlights, an optional legend and
 an optional label, and knows nothing about volume. See
 [006-domain-persistence.md](docs/architecture/006-domain-persistence.md),
 [007-cycle-as-container-and-bff.md](docs/architecture/007-cycle-as-container-and-bff.md) and

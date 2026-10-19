@@ -52,14 +52,18 @@ describe('ProgramEditScreen', () => {
   }
 
   describe('weekly volume', () => {
-    function volumeRows() {
-      const region = screen.getByRole('region', { name: 'Weekly volume' });
-      return within(within(region).getByRole('list', { name: 'Sets per body part' }))
-        .getAllByRole('listitem')
-        .map((item) => item.textContent);
+    function volumeRegion() {
+      return screen.getByRole('region', { name: 'Weekly volume' });
     }
 
-    it('sits between blocks and workouts and counts the current block without optional slots', () => {
+    function highlightOf(part: string) {
+      return (
+        volumeRegion().querySelector(`[data-muscle="${part}"]`)?.getAttribute('data-highlight') ??
+        null
+      );
+    }
+
+    it('sits between blocks and workouts and colours the current block without optional slots', () => {
       renderScreen({
         bodyPartLinks: new Map([
           ['e1', [{ bodyPart: 'chest', role: 'primary' }]],
@@ -73,15 +77,21 @@ describe('ProgramEditScreen', () => {
         'Weekly volume',
         fitnessStrings.programEdit.workoutsTitle,
       ]);
-      expect(volumeRows()[0]).toBe('Chest — 3 sets · Low');
-      expect(volumeRows()).toContain('Name of biceps — 0 sets · None');
+      expect(highlightOf('chest')).toBe('low');
+      expect(highlightOf('biceps')).toBeNull();
     });
 
-    it('shows every body part at none when no exercise is linked', () => {
+    it('shows the chart and its legend without a list of sets', () => {
+      renderScreen({ bodyPartLinks: new Map([['e1', [{ bodyPart: 'chest', role: 'primary' }]]]) });
+
+      expect(within(volumeRegion()).getAllByRole('list')).toHaveLength(1);
+      expect(within(volumeRegion()).queryByText(/sets/)).toBeNull();
+    });
+
+    it('leaves every muscle plain when no exercise is linked', () => {
       renderScreen();
 
-      expect(volumeRows()).toHaveLength(bodyPartIds.length);
-      expect(volumeRows().every((row) => row?.endsWith('0 sets · None'))).toBe(true);
+      expect(volumeRegion().querySelectorAll('[data-highlight]')).toHaveLength(0);
     });
 
     it('is left out when the program has no workouts', () => {

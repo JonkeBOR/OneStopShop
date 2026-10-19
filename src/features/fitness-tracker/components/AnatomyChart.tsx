@@ -136,6 +136,7 @@ export function AnatomyChart({
             key={muscle.key}
             className={muscleClass(highlightOf(muscle.bodyPart))}
             data-muscle={muscle.bodyPart}
+            data-highlight={highlightOf(muscle.bodyPart)}
           >
             {muscle.paths.map((d) => (
               <path key={d} d={d} />
@@ -173,6 +174,7 @@ export function AnatomyChart({
             key={muscle.key}
             className={muscleClass(highlightOf(muscle.bodyPart))}
             data-muscle={muscle.bodyPart}
+            data-highlight={highlightOf(muscle.bodyPart)}
             role="checkbox"
             aria-checked={highlightOf(muscle.bodyPart) !== undefined}
             aria-describedby={describedBy(roleOf(muscle.bodyPart))}
@@ -191,6 +193,7 @@ export function AnatomyChart({
             key={muscle.key}
             className={muscleClass(highlightOf(muscle.bodyPart))}
             data-muscle={muscle.bodyPart}
+            data-highlight={highlightOf(muscle.bodyPart)}
             aria-hidden
             onClick={() => onToggle(muscle.bodyPart)}
           >

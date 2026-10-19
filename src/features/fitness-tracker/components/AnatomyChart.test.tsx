@@ -100,6 +100,24 @@ describe('AnatomyChart', () => {
     ).toBeDefined();
   });
 
+  it('marks every copy of a highlighted muscle with its highlight, in both modes', () => {
+    const readOnly = render(
+      <AnatomyChart bodyParts={bodyParts} highlights={{ calves: 'high' }} readOnly />,
+    );
+    const marked = (container: HTMLElement, part: string) =>
+      [...container.querySelectorAll(`[data-muscle="${part}"]`)].map((group) =>
+        group.getAttribute('data-highlight'),
+      );
+    expect(marked(readOnly.container, 'calves')).toEqual(['high', 'high']);
+    expect(marked(readOnly.container, 'chest')).toEqual([null]);
+    readOnly.unmount();
+
+    const interactive = render(
+      <AnatomyChart bodyParts={bodyParts} highlights={{ chest: 'secondary' }} onToggle={vi.fn()} />,
+    );
+    expect(marked(interactive.container, 'chest')).toEqual(['secondary']);
+  });
+
   it('gives each highlight its own class', () => {
     const { container } = render(
       <AnatomyChart

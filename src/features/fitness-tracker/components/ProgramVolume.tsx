@@ -45,11 +45,6 @@ export function ProgramVolume({ volumes, bodyParts, currentBlockId }: ProgramVol
       return highlight === null ? [] : [[part, highlight]];
     }),
   );
-  const rows = bodyParts.toSorted(
-    (left, right) =>
-      volume.sets[right.id] - volume.sets[left.id] ||
-      bodyPartIds.indexOf(left.id) - bodyPartIds.indexOf(right.id),
-  );
 
   return (
     <div className={styles.volume}>
@@ -79,16 +74,6 @@ export function ProgramVolume({ volumes, bodyParts, currentBlockId }: ProgramVol
         label={strings.chartLabel(blockTitle(volume.block))}
         readOnly
       />
-      <ul className={styles.rows} aria-label={strings.listLabel}>
-        {rows.map((bodyPart) => {
-          const sets = volume.sets[bodyPart.id];
-          return (
-            <li key={bodyPart.id}>
-              {strings.row(bodyPart.name, sets, strings.levels[volumeLevel(sets)])}
-            </li>
-          );
-        })}
-      </ul>
     </div>
   );
 }

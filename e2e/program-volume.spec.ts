@@ -59,7 +59,17 @@ test('estimates the weekly sets each body part gets from the program', async ({
 
   await page.goto(programUrl);
   const volume = page.getByRole('region', { name: fitnessStrings.programVolume.heading });
-  await expect(volume.getByText('Chest — 4 sets · Low', { exact: true })).toBeVisible();
-  await expect(volume.getByText('Triceps — 2 sets · Low', { exact: true })).toBeVisible();
+  await expect(volume.getByRole('img')).toBeVisible();
+  await expect(volume.locator('[data-muscle="chest"]').first()).toHaveAttribute(
+    'data-highlight',
+    'low',
+  );
+  await expect(volume.locator('[data-muscle="triceps"]').first()).toHaveAttribute(
+    'data-highlight',
+    'low',
+  );
+  await expect(volume.locator('[data-muscle="lats"]').first()).not.toHaveAttribute(
+    'data-highlight',
+  );
   await expect(volume.getByRole('combobox')).toHaveCount(0);
 });
