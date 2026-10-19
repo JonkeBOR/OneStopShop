@@ -26,16 +26,16 @@ test('marks the muscles an exercise trains as primary or secondary, and they are
 
   const chest = page.getByRole('checkbox', { name: 'Chest', exact: true });
   await expect(chest).toHaveAttribute('aria-checked', 'false');
-  await expect(chest).not.toHaveAttribute('aria-description');
+  await expect(chest).toHaveAccessibleDescription('');
 
   const primary = savedLink(page, 'PUT');
   await chest.locator('path').first().click();
   await expect(chest).toHaveAttribute('aria-checked', 'true');
-  await expect(chest).toHaveAttribute('aria-description', fitnessStrings.anatomy.roles.primary);
+  await expect(chest).toHaveAccessibleDescription(fitnessStrings.anatomy.roles.primary);
   await primary;
 
   await page.reload();
-  await expect(chest).toHaveAttribute('aria-description', fitnessStrings.anatomy.roles.primary);
+  await expect(chest).toHaveAccessibleDescription(fitnessStrings.anatomy.roles.primary);
   await expect(page.getByRole('checkbox', { name: 'Triceps', exact: true })).toHaveAttribute(
     'aria-checked',
     'false',
@@ -44,16 +44,16 @@ test('marks the muscles an exercise trains as primary or secondary, and they are
   const secondary = savedLink(page, 'PUT');
   await chest.locator('path').first().click();
   await expect(chest).toHaveAttribute('aria-checked', 'true');
-  await expect(chest).toHaveAttribute('aria-description', fitnessStrings.anatomy.roles.secondary);
+  await expect(chest).toHaveAccessibleDescription(fitnessStrings.anatomy.roles.secondary);
   await secondary;
 
   await page.reload();
-  await expect(chest).toHaveAttribute('aria-description', fitnessStrings.anatomy.roles.secondary);
+  await expect(chest).toHaveAccessibleDescription(fitnessStrings.anatomy.roles.secondary);
 
   const unlinked = savedLink(page, 'DELETE');
   await chest.locator('path').first().click();
   await expect(chest).toHaveAttribute('aria-checked', 'false');
-  await expect(chest).not.toHaveAttribute('aria-description');
+  await expect(chest).toHaveAccessibleDescription('');
   await unlinked;
 
   await page.reload();

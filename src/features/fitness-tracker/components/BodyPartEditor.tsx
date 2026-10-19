@@ -1,29 +1,29 @@
 'use client';
 
-import type { BodyPart } from '../domain/body-part';
+import type { BodyPartLink } from '../domain/body-part';
 import type { BodyPartView } from '../domain/types';
 import { AnatomyChart } from './AnatomyChart';
 import { InlineError } from './InlineError';
-import { useBodyPartToggles } from './useBodyPartToggles';
+import { useBodyPartLinks } from './useBodyPartLinks';
 
 type BodyPartEditorProps = {
   exerciseId: string;
   bodyParts: readonly BodyPartView[];
-  selected: readonly BodyPart[];
+  links: readonly BodyPartLink[];
 };
 
-export function BodyPartEditor({ exerciseId, bodyParts, selected }: BodyPartEditorProps) {
-  const toggles = useBodyPartToggles(exerciseId, selected);
+export function BodyPartEditor({ exerciseId, bodyParts, links }: BodyPartEditorProps) {
+  const bodyPartLinks = useBodyPartLinks(exerciseId, links);
 
   return (
     <>
       <AnatomyChart
         bodyParts={bodyParts}
-        selected={toggles.selected}
-        pending={toggles.pending}
-        onToggle={toggles.toggle}
+        highlights={bodyPartLinks.roles}
+        pending={bodyPartLinks.pending}
+        onToggle={bodyPartLinks.tap}
       />
-      <InlineError message={toggles.errorMessage} />
+      <InlineError message={bodyPartLinks.errorMessage} />
     </>
   );
 }
