@@ -69,6 +69,20 @@ describe('ExerciseEditScreen', () => {
     ).toBe('/fitness-tracker/exercises');
   });
 
+  it('has a Variants region listing the exercise variants', () => {
+    render(
+      <ExerciseEditScreen
+        bodyParts={bodyParts}
+        usage={usage({ variants: [{ id: 'v1', name: 'Gym A' }] })}
+      />,
+    );
+
+    const region = screen.getByRole('region', {
+      name: fitnessStrings.exerciseEdit.variants.heading,
+    });
+    expect(within(region).getByText('Gym A')).toBeDefined();
+  });
+
   it('FR-036: renames the exercise and shows a taken name inline', async () => {
     fetchMock.mockResolvedValue(Response.json({ error: 'name-taken' }, { status: 409 }));
     render(<ExerciseEditScreen bodyParts={bodyParts} usage={usage()} />);
