@@ -80,7 +80,7 @@ Cloudflare D1, Vitest (`node`, `dom`, `storage` projects), Playwright.
     nameLabel: 'New variant name',
     add: 'Add variant',
     firstConfirm: 'The last weights already recorded for this exercise will move to this variant.',
-    firstConfirmLabel: 'Add variant',
+    firstConfirmLabel: 'Move weights',
     remove: (name: string) => `Remove ${name}`,
     removeConfirm: 'Last weights for this variant will be deleted.',
     removeConfirmLabel: 'Remove',
