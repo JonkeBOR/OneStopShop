@@ -1,5 +1,6 @@
 export const bodyPartIds = [
-  'traps',
+  'upper-traps',
+  'lower-traps',
   'front-delts',
   'side-delts',
   'rear-delts',
@@ -11,7 +12,6 @@ export const bodyPartIds = [
   'abs',
   'obliques',
   'lats',
-  'upper-back',
   'lower-back',
   'glutes',
   'quads',

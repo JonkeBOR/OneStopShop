@@ -20,13 +20,15 @@ describe('AnatomyChart', () => {
   });
 
   it('checks the selected muscles and leaves the rest unchecked', () => {
-    render(<AnatomyChart bodyParts={bodyParts} selected={['chest', 'traps']} onToggle={vi.fn()} />);
+    render(
+      <AnatomyChart bodyParts={bodyParts} selected={['chest', 'upper-traps']} onToggle={vi.fn()} />,
+    );
 
     expect(
       screen.getByRole('checkbox', { name: 'Name of chest' }).getAttribute('aria-checked'),
     ).toBe('true');
     expect(
-      screen.getByRole('checkbox', { name: 'Name of traps' }).getAttribute('aria-checked'),
+      screen.getByRole('checkbox', { name: 'Name of upper-traps' }).getAttribute('aria-checked'),
     ).toBe('true');
     expect(
       screen.getByRole('checkbox', { name: 'Name of lats' }).getAttribute('aria-checked'),
@@ -45,6 +47,10 @@ describe('AnatomyChart', () => {
     expect(classes[0]).not.toBe(
       container.querySelector('[data-muscle="lats"]')?.getAttribute('class'),
     );
+    expect(container.querySelectorAll('[data-muscle="upper-traps"]')).toHaveLength(2);
+    expect(container.querySelectorAll('[data-muscle="lower-traps"]')).toHaveLength(1);
+    expect(screen.getAllByRole('checkbox', { name: 'Name of upper-traps' })).toHaveLength(1);
+    expect(screen.getAllByRole('checkbox', { name: 'Name of lower-traps' })).toHaveLength(1);
   });
 
   it('toggles a muscle on click, Space and Enter, including its copy in the other view', () => {

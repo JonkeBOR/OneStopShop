@@ -4,7 +4,8 @@ import { bodyPartIds, isBodyPart } from './body-part';
 describe('isBodyPart', () => {
   it('recognises every muscle on the anatomy chart', () => {
     expect(bodyPartIds).toEqual([
-      'traps',
+      'upper-traps',
+      'lower-traps',
       'front-delts',
       'side-delts',
       'rear-delts',
@@ -16,7 +17,6 @@ describe('isBodyPart', () => {
       'abs',
       'obliques',
       'lats',
-      'upper-back',
       'lower-back',
       'glutes',
       'quads',
@@ -32,6 +32,8 @@ describe('isBodyPart', () => {
 
   it('rejects anything else', () => {
     expect(isBodyPart('neck')).toBe(false);
+    expect(isBodyPart('traps')).toBe(false);
+    expect(isBodyPart('upper-back')).toBe(false);
     expect(isBodyPart('Chest')).toBe(false);
     expect(isBodyPart(undefined)).toBe(false);
     expect(isBodyPart(5)).toBe(false);
