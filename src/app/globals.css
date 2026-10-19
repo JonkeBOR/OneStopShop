@@ -17,6 +17,11 @@
   --color-metal-base: #854f6c;
   --color-metal-shine: #fbe4d8;
   --color-focus-ring: #dfb6b2;
+  --color-anatomy-body: #fdfdfd;
+  --color-anatomy-detail: #b8b8b8;
+  --color-anatomy-shade: #959596;
+  --color-anatomy-muscle: #b8b8b8;
+  --color-anatomy-selected: #e53935;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -62,6 +67,11 @@
     /* --color-metal-shadow: #854f6c; */
     --color-metal-base: #dfb6b2;
     --color-metal-shine: #fff8f4;
+    --color-anatomy-body: #3a3d47;
+    --color-anatomy-detail: #6b6e78;
+    --color-anatomy-shade: #24262e;
+    --color-anatomy-muscle: #8a8d96;
+    --color-anatomy-selected: #ff5a4f;
   }
 }
 

@@ -6,8 +6,9 @@ import { fail, type Result, succeed } from '../domain/result';
 import type { Exercise, ExerciseUsage } from '../domain/types';
 import { parseName } from '../domain/values';
 import { isUniqueConstraintViolation } from './batch';
+import { inChartOrder } from './body-parts';
 import { toExercise } from './mapping';
-import { exerciseSlots, exercises, programs, setLogs, workouts } from './schema';
+import { exerciseBodyParts, exerciseSlots, exercises, programs, setLogs, workouts } from './schema';
 
 type NameError = 'name-required' | 'name-too-long' | 'name-taken';
 
@@ -175,7 +176,7 @@ export async function getExerciseUsage(
   if (!exercise) {
     return fail('not-found');
   }
-  const [slots, [log]] = await Promise.all([
+  const [slots, [log], links] = await Promise.all([
     db
       .selectDistinct({
         programId: programs.id,
@@ -194,6 +195,10 @@ export async function getExerciseUsage(
       .from(setLogs)
       .where(and(eq(setLogs.profileId, profileId), eq(setLogs.exerciseId, exerciseId)))
       .limit(1),
+    db
+      .select({ bodyPartId: exerciseBodyParts.bodyPartId })
+      .from(exerciseBodyParts)
+      .where(eq(exerciseBodyParts.exerciseId, exerciseId)),
   ]);
   return succeed({
     exercise: toExercise(exercise),
@@ -204,5 +209,9 @@ export async function getExerciseUsage(
       workoutName,
     })),
     hasSetLogs: log !== undefined,
+    bodyParts: inChartOrder(
+      links.map((link) => link.bodyPartId),
+      (bodyPart) => bodyPart,
+    ),
   });
 }

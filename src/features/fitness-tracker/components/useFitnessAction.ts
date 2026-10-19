@@ -12,7 +12,7 @@ const staleViewCodes: readonly FitnessErrorCode[] = [
   'session-not-in-progress',
 ];
 
-function errorCodeOf(body: unknown): FitnessErrorCode {
+export function errorCodeOf(body: unknown): FitnessErrorCode {
   if (typeof body === 'object' && body !== null && 'error' in body) {
     const code = body.error;
     if (isFitnessErrorCode(code)) {

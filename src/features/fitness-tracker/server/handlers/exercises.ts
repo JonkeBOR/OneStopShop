@@ -1,4 +1,5 @@
 import 'server-only';
+import { linkBodyPart, unlinkBodyPart } from '../body-parts';
 import {
   addExercise,
   archiveExercise,
@@ -8,6 +9,7 @@ import {
 } from '../exercises';
 import type { FitnessRequestContext } from '../fitness-route';
 import { hasKey, readBoolean, readJson, readString, respond, respondEmpty } from '../http';
+import { isBodyPart } from '../../domain/body-part';
 import { fail } from '../../domain/result';
 
 export async function handleAddExercise({
@@ -65,4 +67,28 @@ export async function handleDeleteExercise({
   params,
 }: FitnessRequestContext): Promise<Response> {
   return respondEmpty(await deleteExercise(db, profileId, params.id ?? ''));
+}
+
+export async function handleLinkBodyPart({
+  db,
+  profileId,
+  params,
+}: FitnessRequestContext): Promise<Response> {
+  const bodyPart = params.bodyPart;
+  if (!isBodyPart(bodyPart)) {
+    return respond(fail('not-found'));
+  }
+  return respondEmpty(await linkBodyPart(db, profileId, params.id ?? '', bodyPart));
+}
+
+export async function handleUnlinkBodyPart({
+  db,
+  profileId,
+  params,
+}: FitnessRequestContext): Promise<Response> {
+  const bodyPart = params.bodyPart;
+  if (!isBodyPart(bodyPart)) {
+    return respond(fail('not-found'));
+  }
+  return respondEmpty(await unlinkBodyPart(db, profileId, params.id ?? '', bodyPart));
 }

@@ -82,6 +82,16 @@ Triggers on `set_logs` abort every `UPDATE` and `DELETE` (`migrations/0001_set_l
 Context columns on `set_logs` and `workout_sessions` carry no foreign keys, so deleting a program
 never touches history. The one foreign key is `exercise_id … ON DELETE RESTRICT`.
 
+### Body parts are a seeded lookup table
+
+`body_parts` holds the 20 muscles of the anatomy chart. Its `id` is the slug the chart uses
+(`chest`, `front-delts`, …) and `name` is the display name. It is the one table that is not
+profile-scoped. The rows are inserted by a migration (`0007_body_parts_data.sql`), not by the app,
+and the ids are the closed `BodyPart` union in `domain/body-part.ts`, which the schema uses as the
+column's enum. `exercise_body_parts` links an exercise to its muscles with the primary key
+`(exercise_id, body_part_id)`. It cascades when an exercise is deleted and restricts deleting a body
+part. A per-link score (bench press: chest 10, front delts 5) would be a column on that row.
+
 ### Storage is tested against a real local D1
 
 A third Vitest project, `storage`, runs `src/**/*.storage.test.ts`. A `globalSetup`
