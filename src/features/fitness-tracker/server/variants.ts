@@ -1,11 +1,11 @@
 import 'server-only';
-import { and, asc, eq, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm';
 import type { Database } from '@/lib/server/database';
 import { exerciseNameKey } from '../domain/exercise';
 import { fail, type Result, succeed } from '../domain/result';
 import type { ExerciseVariant } from '../domain/types';
 import { parseName } from '../domain/values';
-import { fallbackVariantId, removalOf } from '../domain/variant';
+import { decideVariantSwitch, fallbackVariantId, removalOf } from '../domain/variant';
 import { chunkIds, runBatch, type Statement } from './batch';
 import { toExerciseVariant } from './mapping';
 import {
@@ -15,6 +15,7 @@ import {
   plannedSets,
   plannedSetVariantWeights,
   setLogs,
+  workoutSessions,
 } from './schema';
 
 export async function listActiveVariants(
@@ -146,6 +147,67 @@ export async function removeVariant(
       : db.delete(exerciseVariants).where(eq(exerciseVariants.id, variantId)),
   ]);
   return succeed({ removal });
+}
+
+export async function switchSlotVariant(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  slotId: string,
+  input: { variantId: string },
+): Promise<Result<void, 'not-found' | 'session-not-in-progress' | 'variant-locked'>> {
+  const [session] = await db
+    .select()
+    .from(workoutSessions)
+    .where(and(eq(workoutSessions.id, sessionId), eq(workoutSessions.profileId, profileId)))
+    .limit(1);
+  if (!session) {
+    return fail('not-found');
+  }
+  const [slot] = await db
+    .select({ exerciseId: exerciseSlots.exerciseId })
+    .from(exerciseSlots)
+    .where(and(eq(exerciseSlots.id, slotId), eq(exerciseSlots.workoutId, session.workoutId)))
+    .limit(1);
+  if (!slot) {
+    return fail('not-found');
+  }
+  const [[current], [logged], active] = await Promise.all([
+    db
+      .select({ variantId: plannedSets.variantId })
+      .from(plannedSets)
+      .where(
+        and(
+          eq(plannedSets.exerciseSlotId, slotId),
+          eq(plannedSets.trainingBlockId, session.trainingBlockId),
+        ),
+      )
+      .limit(1),
+    db
+      .select({ total: count() })
+      .from(setLogs)
+      .where(and(eq(setLogs.workoutSessionId, session.id), eq(setLogs.exerciseSlotId, slotId))),
+    listActiveVariants(db, [slot.exerciseId]),
+  ]);
+  const decision = decideVariantSwitch({
+    sessionStatus: session.status,
+    loggedSetsInSlot: logged?.total ?? 0,
+    currentVariantId: current?.variantId ?? null,
+    targetVariantId: input.variantId,
+    activeVariantIds: (active.get(slot.exerciseId) ?? []).map((variant) => variant.id),
+  });
+  if (!decision.ok) {
+    return fail(decision.error);
+  }
+  if (decision.value.kind === 'switch') {
+    await runBatch(
+      db,
+      swapVariantStatements(db, eq(plannedSets.exerciseSlotId, slotId), input.variantId, {
+        parkCurrent: true,
+      }),
+    );
+  }
+  return succeed(undefined);
 }
 
 export function swapVariantStatements(

@@ -4,10 +4,11 @@ import type { Program, SessionView } from '../domain/types';
 import { activateProgram } from './activation';
 import { ensureProfile } from './profile';
 import { getProgram } from './programs';
-import { cycles, plannedSets, setLogs } from './schema';
+import { cycles, plannedSets, plannedSetVariantWeights, setLogs } from './schema';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
 import { createProgramFromSpec, expectOk, type ProgramSpec } from './storage-test-support';
 import { finishWorkout, getSession, getTrainingOverview, logSet, startWorkout } from './training';
+import { addVariant, switchSlotVariant } from './variants';
 
 describe('training', () => {
   let testDatabase: TestDatabase;
@@ -388,5 +389,95 @@ describe('training', () => {
       error: 'workout-not-in-active-program',
     });
     expect(await getTrainingOverview(db, crypto.randomUUID())).toBeNull();
+  });
+
+  describe('with exercise variants', () => {
+    const later = new Date('2026-10-02T11:00:00Z');
+
+    async function variantSession() {
+      const { db } = testDatabase;
+      const program = await activeProgram({
+        blockCount: 2,
+        workouts: [{ name: 'Lower A', slots: [{ exercise: 'Squat', targetReps: [5, 5] }] }],
+      });
+      const slot = program.workouts[0]?.slots[0];
+      const exerciseId = slot?.exercise.id ?? '';
+      const barbell = expectOk(
+        await addVariant(db, profileId, exerciseId, { name: 'Barbell' }, now),
+      );
+      const smith = expectOk(await addVariant(db, profileId, exerciseId, { name: 'Smith' }, later));
+      const session = await open(program.workouts[0]?.id ?? '');
+      return { slotId: slot?.id ?? '', barbell, smith, session };
+    }
+
+    it('logSet records the slot’s selected variant on the set log', async () => {
+      const { db } = testDatabase;
+      const { barbell, session } = await variantSession();
+
+      const logged = expectOk(
+        await logSet(
+          db,
+          profileId,
+          session.id,
+          session.slots[0]?.plannedSets[0]?.id ?? '',
+          { reps: 5, weightKg: 40 },
+          now,
+        ),
+      );
+
+      expect(logged.variantId).toBe(barbell.id);
+      const [stored] = await db.select().from(setLogs).where(eq(setLogs.id, logged.id));
+      expect(stored?.variantId).toBe(barbell.id);
+    });
+
+    it('logSet records the variant the slot was switched to', async () => {
+      const { db } = testDatabase;
+      const { slotId, smith, session } = await variantSession();
+      expectOk(await switchSlotVariant(db, profileId, session.id, slotId, { variantId: smith.id }));
+
+      const logged = expectOk(
+        await logSet(
+          db,
+          profileId,
+          session.id,
+          session.slots[0]?.plannedSets[0]?.id ?? '',
+          { reps: 5, weightKg: 30 },
+          now,
+        ),
+      );
+
+      expect(logged.variantId).toBe(smith.id);
+    });
+
+    it('logSet updates only the selected variant’s weight', async () => {
+      const { db } = testDatabase;
+      const { slotId, barbell, smith, session } = await variantSession();
+      await db
+        .update(plannedSets)
+        .set({ lastWeightGrams: 40000 })
+        .where(eq(plannedSets.exerciseSlotId, slotId));
+      expectOk(await switchSlotVariant(db, profileId, session.id, slotId, { variantId: smith.id }));
+      await db
+        .update(plannedSets)
+        .set({ lastWeightGrams: 30000 })
+        .where(eq(plannedSets.exerciseSlotId, slotId));
+      const target = session.slots[0]?.plannedSets[0]?.id ?? '';
+
+      expectOk(await logSet(db, profileId, session.id, target, { reps: 5, weightKg: 32.5 }, now));
+
+      const [updated] = await db.select().from(plannedSets).where(eq(plannedSets.id, target));
+      expect(updated?.variantId).toBe(smith.id);
+      expect(updated?.lastWeightGrams).toBe(32500);
+      const parked = await db
+        .select()
+        .from(plannedSetVariantWeights)
+        .where(
+          and(
+            eq(plannedSetVariantWeights.plannedSetId, target),
+            eq(plannedSetVariantWeights.variantId, barbell.id),
+          ),
+        );
+      expect(parked.map((row) => row.lastWeightGrams)).toEqual([40000]);
+    });
   });
 });

@@ -1,12 +1,20 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Program } from '../domain/types';
+import { activateProgram } from './activation';
 import { runBatch } from './batch';
 import { ensureProfile } from './profile';
 import { exerciseVariants, plannedSets, plannedSetVariantWeights, setLogs } from './schema';
 import { createProgramFromSpec, expectOk } from './storage-test-support';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
-import { addVariant, listActiveVariants, removeVariant, swapVariantStatements } from './variants';
+import { finishWorkout, getSession, logSet, startWorkout } from './training';
+import {
+  addVariant,
+  listActiveVariants,
+  removeVariant,
+  swapVariantStatements,
+  switchSlotVariant,
+} from './variants';
 
 describe('exercise variants', () => {
   let testDatabase: TestDatabase;
@@ -393,5 +401,191 @@ describe('exercise variants', () => {
       [slotSets[1], 30000],
     ]);
     expect(await parkedRows(slotSets)).toHaveLength(1);
+  });
+
+  async function switchingSetup() {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    expectOk(await activateProgram(db, profileId, program.id, now));
+    const squatId = exerciseIdOf(program, 'Squat');
+    const slotId = slotsOf(program, 'Squat')[0]?.id ?? '';
+    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
+    const session = expectOk(await startWorkout(db, profileId, program.workouts[0]?.id ?? '', now));
+    return { program, slotId, barbell, smith, session };
+  }
+
+  async function slotSetRows(slotId: string) {
+    return testDatabase.db
+      .select({
+        id: plannedSets.id,
+        blockId: plannedSets.trainingBlockId,
+        setNumber: plannedSets.setNumber,
+        variantId: plannedSets.variantId,
+        lastWeightGrams: plannedSets.lastWeightGrams,
+      })
+      .from(plannedSets)
+      .where(eq(plannedSets.exerciseSlotId, slotId))
+      .orderBy(asc(plannedSets.trainingBlockId), asc(plannedSets.setNumber));
+  }
+
+  it('the session lists the exercise’s active variants and the slot’s selected one', async () => {
+    const { db } = testDatabase;
+    const { slotId, barbell, smith, session } = await switchingSetup();
+
+    const view = expectOk(await getSession(db, profileId, session.id));
+
+    const squat = view.slots.find((entry) => entry.id === slotId);
+    expect(squat?.variants).toEqual([barbell, smith]);
+    expect(squat?.selectedVariantId).toBe(barbell.id);
+    const curl = view.slots.find((entry) => entry.id !== slotId);
+    expect(curl?.variants).toEqual([]);
+    expect(curl?.selectedVariantId).toBeNull();
+  });
+
+  it('switching loads the target’s weights into every block of the slot and parks the current ones', async () => {
+    const { db } = testDatabase;
+    const { slotId, barbell, smith, session } = await switchingSetup();
+    const before = await slotSetRows(slotId);
+    expect(before).toHaveLength(4);
+    const blockIds = [...new Set(before.map((row) => row.blockId))];
+    const weightFor = (row: { blockId: string; setNumber: number }, base: number) =>
+      base + blockIds.indexOf(row.blockId) * 5000 + row.setNumber * 1000;
+    for (const row of before) {
+      await setWeights([row.id], weightFor(row, 40000));
+      await park([row.id], smith.id, weightFor(row, 20000));
+    }
+
+    expectOk(await switchSlotVariant(db, profileId, session.id, slotId, { variantId: smith.id }));
+
+    const rows = await slotSetRows(slotId);
+    expect(rows.every((row) => row.variantId === smith.id)).toBe(true);
+    expect(rows.map((row) => row.lastWeightGrams)).toEqual(
+      before.map((row) => weightFor(row, 20000)),
+    );
+    const parked = await parkedRows(rows.map((row) => row.id));
+    expect(parked.every((row) => row.variantId === barbell.id)).toBe(true);
+    expect(
+      Object.fromEntries(parked.map((row) => [row.plannedSetId, row.lastWeightGrams])),
+    ).toEqual(Object.fromEntries(before.map((row) => [row.id, weightFor(row, 40000)])));
+    expect(parked).toHaveLength(4);
+  });
+
+  it('switching A → B → A restores A’s weights exactly and never parks a null', async () => {
+    const { db } = testDatabase;
+    const { slotId, barbell, smith, session } = await switchingSetup();
+    const before = await slotSetRows(slotId);
+    await setWeights(
+      before.filter((row) => row.setNumber === 1).map((row) => row.id),
+      40000,
+    );
+
+    expectOk(await switchSlotVariant(db, profileId, session.id, slotId, { variantId: smith.id }));
+    expectOk(await switchSlotVariant(db, profileId, session.id, slotId, { variantId: barbell.id }));
+
+    const rows = await slotSetRows(slotId);
+    expect(rows.every((row) => row.variantId === barbell.id)).toBe(true);
+    expect(rows.map((row) => [row.setNumber, row.lastWeightGrams])).toEqual([
+      [1, 40000],
+      [2, null],
+      [1, 40000],
+      [2, null],
+    ]);
+    expect(await parkedRows(rows.map((row) => row.id))).toEqual([]);
+  });
+
+  it('refuses to switch once a set of the slot is logged in this session, and another slot does not lock it', async () => {
+    const { db } = testDatabase;
+    const { slotId, barbell, smith, session } = await switchingSetup();
+    const slotOf = async (predicate: (id: string) => boolean) =>
+      expectOk(await getSession(db, profileId, session.id)).slots.find((entry) =>
+        predicate(entry.id),
+      );
+    const curl = await slotOf((id) => id !== slotId);
+    expectOk(
+      await logSet(db, profileId, session.id, curl?.plannedSets[0]?.id ?? '', { reps: 10 }, now),
+    );
+
+    expectOk(await switchSlotVariant(db, profileId, session.id, slotId, { variantId: smith.id }));
+
+    const squat = await slotOf((id) => id === slotId);
+    expectOk(
+      await logSet(
+        db,
+        profileId,
+        session.id,
+        squat?.plannedSets[0]?.id ?? '',
+        { reps: 5, weightKg: 30 },
+        later,
+      ),
+    );
+    const before = await slotSetRows(slotId);
+    const parkedBefore = await parkedRows(before.map((row) => row.id));
+
+    expect(
+      await switchSlotVariant(db, profileId, session.id, slotId, { variantId: barbell.id }),
+    ).toEqual({ ok: false, error: 'variant-locked' });
+
+    expect(await slotSetRows(slotId)).toEqual(before);
+    expect(await parkedRows(before.map((row) => row.id))).toEqual(parkedBefore);
+  });
+
+  it('switching to the selected variant succeeds without writing', async () => {
+    const { db } = testDatabase;
+    const { slotId, barbell, session } = await switchingSetup();
+    await setWeights(
+      (await slotSetRows(slotId)).map((row) => row.id),
+      40000,
+    );
+    const before = await slotSetRows(slotId);
+
+    expect(
+      await switchSlotVariant(db, profileId, session.id, slotId, { variantId: barbell.id }),
+    ).toEqual({ ok: true, value: undefined });
+
+    expect(await slotSetRows(slotId)).toEqual(before);
+    expect(await parkedRows(before.map((row) => row.id))).toEqual([]);
+  });
+
+  it('refuses another profile’s session, a slot outside the session’s workout and a variant of another exercise as not-found, and a finished session as not in progress', async () => {
+    const { db } = testDatabase;
+    const { program, slotId, smith, session } = await switchingSetup();
+    const curlVariant = expectOk(
+      await addVariant(db, profileId, exerciseIdOf(program, 'Curl'), { name: 'Cable' }, now),
+    );
+    const otherWorkoutSlotId = program.workouts[1]?.slots[0]?.id ?? '';
+    const otherProfileId = (await ensureProfile(db, crypto.randomUUID(), now)).id;
+    const before = await slotSetRows(slotId);
+    const otherWorkoutBefore = await slotSetRows(otherWorkoutSlotId);
+    const refused = { ok: false, error: 'not-found' };
+
+    expect(
+      await switchSlotVariant(db, otherProfileId, session.id, slotId, { variantId: smith.id }),
+    ).toEqual(refused);
+    expect(
+      await switchSlotVariant(db, profileId, session.id, otherWorkoutSlotId, {
+        variantId: smith.id,
+      }),
+    ).toEqual(refused);
+    expect(
+      await switchSlotVariant(db, profileId, session.id, crypto.randomUUID(), {
+        variantId: smith.id,
+      }),
+    ).toEqual(refused);
+    expect(
+      await switchSlotVariant(db, profileId, crypto.randomUUID(), slotId, { variantId: smith.id }),
+    ).toEqual(refused);
+    expect(
+      await switchSlotVariant(db, profileId, session.id, slotId, { variantId: curlVariant.id }),
+    ).toEqual(refused);
+    expect(await slotSetRows(slotId)).toEqual(before);
+    expect(await slotSetRows(otherWorkoutSlotId)).toEqual(otherWorkoutBefore);
+
+    expectOk(await finishWorkout(db, profileId, session.id, later));
+
+    expect(
+      await switchSlotVariant(db, profileId, session.id, slotId, { variantId: smith.id }),
+    ).toEqual({ ok: false, error: 'session-not-in-progress' });
+    expect(await slotSetRows(slotId)).toEqual(before);
   });
 });

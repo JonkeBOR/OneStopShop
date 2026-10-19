@@ -88,6 +88,8 @@ export type SessionSlot = {
   isOptional: boolean;
   plannedSets: SessionPlannedSet[];
   loggedSets: SetLog[];
+  variants: ExerciseVariant[];
+  selectedVariantId: string | null;
 };
 
 export type SessionView = {

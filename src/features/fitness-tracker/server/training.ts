@@ -20,6 +20,7 @@ import {
   workoutSessions,
   workouts,
 } from './schema';
+import { listActiveVariants } from './variants';
 
 type ActiveContext = {
   programId: string;
@@ -191,6 +192,10 @@ export async function getSession(
       .orderBy(asc(setLogs.performedAt), sql`rowid`),
   ]);
   const logs = logRows.map(toSetLog);
+  const variantsByExercise = await listActiveVariants(
+    db,
+    slotRows.map((slot) => slot.exerciseId),
+  );
   return succeed({
     id: session.id,
     status: session.status,
@@ -208,6 +213,8 @@ export async function getSession(
       isOptional: slot.isOptional,
       plannedSets: prefill(slot.plannedSets),
       loggedSets: logs.filter((log) => log.context.exerciseSlotId === slot.id),
+      variants: variantsByExercise.get(slot.exerciseId) ?? [],
+      selectedVariantId: slot.plannedSets[0]?.variantId ?? null,
     })),
   });
 }
@@ -330,6 +337,7 @@ export async function logSet(
   const [target] = await db
     .select({
       setNumber: plannedSets.setNumber,
+      variantId: plannedSets.variantId,
       slotId: exerciseSlots.id,
       slotWorkoutId: exerciseSlots.workoutId,
       exerciseId: exerciseSlots.exerciseId,
@@ -375,7 +383,7 @@ export async function logSet(
     workoutSessionId: session.id,
     pass: session.pass,
     blockNumber: target.blockNumber,
-    variantId: null,
+    variantId: target.variantId,
   };
   await runBatch(db, [
     db.insert(setLogs).values(row),
