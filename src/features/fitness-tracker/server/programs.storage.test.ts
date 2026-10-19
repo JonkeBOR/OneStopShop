@@ -20,8 +20,9 @@ import {
   replaceSlotExercise,
   setPrescription,
   setSlotOptional,
+  setUniformPrescription,
 } from './programs';
-import { plannedSets, setLogs, workoutSessions } from './schema';
+import { plannedSets, plannedSetVariantWeights, setLogs, workoutSessions } from './schema';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
 import {
   activeOverview,
@@ -30,6 +31,7 @@ import {
   type ProgramSpec,
 } from './storage-test-support';
 import { finishWorkout, logSet, startWorkout } from './training';
+import { addVariant } from './variants';
 
 function targetsByBlock(program: Program, workoutIndex: number, slotIndex: number): number[][] {
   const slot = program.workouts[workoutIndex]?.slots[slotIndex];
@@ -315,6 +317,137 @@ describe('program structure', () => {
       [1, 12, 40],
       [2, 12, 40],
     ]);
+  });
+
+  async function plannedSetsOfSlot(slotId: string) {
+    return testDatabase.db
+      .select({
+        trainingBlockId: plannedSets.trainingBlockId,
+        setNumber: plannedSets.setNumber,
+        variantId: plannedSets.variantId,
+        lastWeightGrams: plannedSets.lastWeightGrams,
+      })
+      .from(plannedSets)
+      .where(eq(plannedSets.exerciseSlotId, slotId));
+  }
+
+  async function parkedWeightsOfSlot(slotId: string) {
+    return testDatabase.db
+      .select({
+        variantId: plannedSetVariantWeights.variantId,
+        lastWeightGrams: plannedSetVariantWeights.lastWeightGrams,
+      })
+      .from(plannedSetVariantWeights)
+      .innerJoin(plannedSets, eq(plannedSets.id, plannedSetVariantWeights.plannedSetId))
+      .where(eq(plannedSets.exerciseSlotId, slotId));
+  }
+
+  async function addVariants(exerciseId: string, names: readonly string[]): Promise<string[]> {
+    const ids: string[] = [];
+    for (const [index, name] of names.entries()) {
+      const createdAt = new Date(now.getTime() + index * 60_000);
+      ids.push(
+        expectOk(await addVariant(testDatabase.db, profileId, exerciseId, { name }, createdAt)).id,
+      );
+    }
+    return ids;
+  }
+
+  it('a new slot starts on the exercise’s oldest active variant with no weights', async () => {
+    const [barbellId] = await addVariants(inclineBenchId, ['Barbell', 'Dumbbell']);
+
+    const { program } = await programWithOneSlot(2, [10, 10]);
+
+    const slotId = program.workouts[0]?.slots[0]?.id ?? '';
+    const rows = await plannedSetsOfSlot(slotId);
+    expect(rows).toHaveLength(4);
+    expect(rows.every((row) => row.variantId === barbellId && row.lastWeightGrams === null)).toBe(
+      true,
+    );
+    expect(await parkedWeightsOfSlot(slotId)).toEqual([]);
+  });
+
+  it('replacing a slot’s exercise selects the new exercise’s oldest active variant, or none, and drops all parked weights', async () => {
+    const { db } = testDatabase;
+    const [, dumbbellId] = await addVariants(inclineBenchId, ['Barbell', 'Dumbbell']);
+    const { program } = await programWithOneSlot(2, [10, 10]);
+    const slotId = program.workouts[0]?.slots[0]?.id ?? '';
+    await db
+      .update(plannedSets)
+      .set({ lastWeightGrams: 40000 })
+      .where(eq(plannedSets.exerciseSlotId, slotId));
+    const plannedSetIds = (program.workouts[0]?.slots[0]?.prescriptions ?? []).flatMap(
+      (prescription) => prescription.plannedSets.map((plannedSet) => plannedSet.id),
+    );
+    await db.insert(plannedSetVariantWeights).values(
+      plannedSetIds.map((plannedSetId) => ({
+        plannedSetId,
+        variantId: dumbbellId ?? '',
+        lastWeightGrams: 30000,
+      })),
+    );
+    const pressId = expectOk(await addExercise(db, profileId, { name: 'Machine press' }, now)).id;
+    const [plateLoadedId] = await addVariants(pressId, ['Plate loaded', 'Selectorized']);
+    const flyId = expectOk(await addExercise(db, profileId, { name: 'Fly' }, now)).id;
+
+    expectOk(await replaceSlotExercise(db, profileId, slotId, { exerciseId: pressId }));
+
+    const replaced = await plannedSetsOfSlot(slotId);
+    expect(replaced).toHaveLength(4);
+    expect(
+      replaced.every((row) => row.variantId === plateLoadedId && row.lastWeightGrams === null),
+    ).toBe(true);
+    expect(await parkedWeightsOfSlot(slotId)).toEqual([]);
+
+    expectOk(await replaceSlotExercise(db, profileId, slotId, { exerciseId: flyId }));
+
+    expect(
+      (await plannedSetsOfSlot(slotId)).every(
+        (row) => row.variantId === null && row.lastWeightGrams === null,
+      ),
+    ).toBe(true);
+    expect(await parkedWeightsOfSlot(slotId)).toEqual([]);
+  });
+
+  it('adding sets to a prescription gives the new planned sets the slot’s variant', async () => {
+    const { db } = testDatabase;
+    const [barbellId] = await addVariants(inclineBenchId, ['Barbell', 'Dumbbell']);
+    const { program, workoutId } = await programWithOneSlot(2, [10]);
+    const periodizedSlotId = program.workouts[0]?.slots[0]?.id ?? '';
+    const rowId = expectOk(await addExercise(db, profileId, { name: 'Row' }, now)).id;
+    const [cableId] = await addVariants(rowId, ['Cable', 'Chest supported']);
+    const withRow = expectOk(
+      await addExerciseSlot(db, profileId, workoutId, {
+        exerciseId: rowId,
+        targetReps: [10],
+        isPeriodized: false,
+      }),
+    );
+    const uniformSlotId = withRow.workouts[0]?.slots[1]?.id ?? '';
+
+    expectOk(
+      await setPrescription(db, profileId, periodizedSlotId, program.blocks[1]?.id ?? '', {
+        targetReps: [10, 10, 10],
+      }),
+    );
+    expectOk(await setUniformPrescription(db, profileId, uniformSlotId, { targetReps: [8, 8] }));
+
+    const periodized = await plannedSetsOfSlot(periodizedSlotId);
+    expect(periodized).toHaveLength(4);
+    expect(periodized.every((row) => row.variantId === barbellId)).toBe(true);
+    const uniform = await plannedSetsOfSlot(uniformSlotId);
+    expect(uniform).toHaveLength(4);
+    expect(uniform.every((row) => row.variantId === cableId)).toBe(true);
+  });
+
+  it('the weekly volume estimate is unchanged by variants', async () => {
+    const { db } = testDatabase;
+    const { program } = await programWithOneSlot(2, [10, 10]);
+    const before = expectOk(await getProgram(db, profileId, program.id));
+
+    await addVariants(inclineBenchId, ['Barbell', 'Dumbbell']);
+
+    expect(expectOk(await getProgram(db, profileId, program.id))).toEqual(before);
   });
 
   it('moves workouts, slots and blocks, renumbering positions 1 to n without gaps', async () => {

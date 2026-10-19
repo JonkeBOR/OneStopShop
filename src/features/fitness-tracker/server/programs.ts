@@ -16,6 +16,7 @@ import { reevaluateAfterEdit } from '../domain/progression';
 import { fail, type Result, succeed } from '../domain/result';
 import type { Program, ProgramSummary } from '../domain/types';
 import { parseName } from '../domain/values';
+import type { ParkedWeight } from '../domain/variant';
 import { chunkIds, chunkRows, runBatch, type Statement } from './batch';
 import { insertCycleStatement, startPassStatements } from './cycle-statements';
 import { type ProgramRows, toProgram } from './mapping';
@@ -24,12 +25,14 @@ import {
   exerciseSlots,
   exercises,
   plannedSets,
+  plannedSetVariantWeights,
   profiles,
   programs,
   trainingBlocks,
   workoutSessions,
   workouts,
 } from './schema';
+import { listActiveVariants } from './variants';
 
 type NameError = 'name-required' | 'name-too-long';
 type MoveError = 'not-found' | 'invalid-position';
@@ -41,7 +44,8 @@ type ExistingPlannedSet = {
   lastWeightGrams: number | null;
 };
 
-const plannedSetColumns = 6;
+const plannedSetColumns = 7;
+const parkedWeightColumns = 3;
 const trainingBlockColumns = 4;
 
 export async function loadProgramRows(
@@ -135,8 +139,49 @@ function insertPlannedSets(db: Database, drafts: readonly PlannedSetDraft[]): St
     setNumber: draft.setNumber,
     targetReps: draft.targetReps,
     lastWeightGrams: draft.lastWeightGrams ?? null,
+    variantId: draft.variantId ?? null,
   }));
-  return chunkRows(rows, plannedSetColumns).map((part) => db.insert(plannedSets).values(part));
+  const parkedRows = rows.flatMap((row, index) =>
+    (drafts[index]?.parkedWeights ?? []).map((parked) => ({
+      plannedSetId: row.id,
+      variantId: parked.variantId,
+      lastWeightGrams: parked.lastWeightGrams,
+    })),
+  );
+  return [
+    ...chunkRows(rows, plannedSetColumns).map((part) => db.insert(plannedSets).values(part)),
+    ...chunkRows(parkedRows, parkedWeightColumns).map((part) =>
+      db.insert(plannedSetVariantWeights).values(part),
+    ),
+  ];
+}
+
+function deleteParkedWeightsOfSlot(db: Database, slotId: string): Statement {
+  return db
+    .delete(plannedSetVariantWeights)
+    .where(
+      inArray(
+        plannedSetVariantWeights.plannedSetId,
+        db
+          .select({ id: plannedSets.id })
+          .from(plannedSets)
+          .where(eq(plannedSets.exerciseSlotId, slotId)),
+      ),
+    );
+}
+
+async function slotVariantId(db: Database, slotId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ variantId: plannedSets.variantId })
+    .from(plannedSets)
+    .where(eq(plannedSets.exerciseSlotId, slotId))
+    .limit(1);
+  return row?.variantId ?? null;
+}
+
+async function oldestActiveVariantId(db: Database, exerciseId: string): Promise<string | null> {
+  const variants = await listActiveVariants(db, [exerciseId]);
+  return variants.get(exerciseId)?.[0]?.id ?? null;
 }
 
 function reorderBlocks(
@@ -300,6 +345,7 @@ export async function addTrainingBlock(
     return fail('not-found');
   }
   const newBlockId = crypto.randomUUID();
+  const parkedBySet = await parkedWeightsOfBlock(db, lastBlock.id);
   const slotTargets = rows.workouts.flatMap((workout) =>
     workout.slots.map((slot) => {
       const lastBlockSets = slot.plannedSets
@@ -311,6 +357,10 @@ export async function addTrainingBlock(
         lastWeightsGrams: slot.isPeriodized
           ? []
           : lastBlockSets.map((plannedSet) => plannedSet.lastWeightGrams),
+        variantId: slot.plannedSets[0]?.variantId ?? null,
+        parkedWeightsBySet: slot.isPeriodized
+          ? []
+          : lastBlockSets.map((plannedSet) => parkedBySet.get(plannedSet.id) ?? []),
       };
     }),
   );
@@ -324,6 +374,26 @@ export async function addTrainingBlock(
     ...insertPlannedSets(db, draftsForNewBlock(slotTargets, newBlockId)),
   ]);
   return getProgram(db, profileId, programId);
+}
+
+async function parkedWeightsOfBlock(
+  db: Database,
+  blockId: string,
+): Promise<Map<string, ParkedWeight[]>> {
+  const rows = await db
+    .select({
+      plannedSetId: plannedSetVariantWeights.plannedSetId,
+      variantId: plannedSetVariantWeights.variantId,
+      lastWeightGrams: plannedSetVariantWeights.lastWeightGrams,
+    })
+    .from(plannedSetVariantWeights)
+    .innerJoin(plannedSets, eq(plannedSets.id, plannedSetVariantWeights.plannedSetId))
+    .where(eq(plannedSets.trainingBlockId, blockId));
+  const bySet = new Map<string, ParkedWeight[]>();
+  for (const { plannedSetId, ...parked } of rows) {
+    bySet.set(plannedSetId, [...(bySet.get(plannedSetId) ?? []), parked]);
+  }
+  return bySet;
 }
 
 function normalizeLabel(label: string | null | undefined): string | null {
@@ -490,6 +560,7 @@ export async function addExerciseSlot(
   if (!drafts.ok) {
     return fail(drafts.error);
   }
+  const variantId = await oldestActiveVariantId(db, input.exerciseId);
   await runBatch(db, [
     db.insert(exerciseSlots).values({
       id: slotId,
@@ -499,7 +570,10 @@ export async function addExerciseSlot(
       isOptional: false,
       isPeriodized: input.isPeriodized ?? true,
     }),
-    ...insertPlannedSets(db, drafts.value),
+    ...insertPlannedSets(
+      db,
+      drafts.value.map((draft) => ({ ...draft, variantId })),
+    ),
   ]);
   return getProgram(db, profileId, programId);
 }
@@ -616,6 +690,7 @@ function prescriptionStatements(
   db: Database,
   slotId: string,
   blockId: string,
+  variantId: string | null,
   existing: readonly { id: string; setNumber: number }[],
   targetReps: readonly number[],
 ): Result<Statement[], TargetsError> {
@@ -637,6 +712,7 @@ function prescriptionStatements(
         trainingBlockId: blockId,
         setNumber: item.setNumber,
         targetReps: item.targetReps,
+        variantId,
       })),
     ),
     ...chunkIds(change.value.deleteIds).map((ids) =>
@@ -648,6 +724,7 @@ function prescriptionStatements(
 function uniformPrescriptionStatements(
   db: Database,
   slotId: string,
+  variantId: string | null,
   blockIds: readonly string[],
   existing: readonly ExistingPlannedSet[],
   targetReps: readonly number[],
@@ -658,6 +735,7 @@ function uniformPrescriptionStatements(
       db,
       slotId,
       blockId,
+      variantId,
       existing.filter((plannedSet) => plannedSet.trainingBlockId === blockId),
       targetReps,
     );
@@ -686,11 +764,21 @@ export async function setPrescription(
   if (!slot.isPeriodized) {
     return fail('slot-not-periodized');
   }
-  const existing = await db
-    .select({ id: plannedSets.id, setNumber: plannedSets.setNumber })
-    .from(plannedSets)
-    .where(and(eq(plannedSets.exerciseSlotId, slotId), eq(plannedSets.trainingBlockId, blockId)));
-  const statements = prescriptionStatements(db, slotId, blockId, existing, input.targetReps);
+  const [existing, variantId] = await Promise.all([
+    db
+      .select({ id: plannedSets.id, setNumber: plannedSets.setNumber })
+      .from(plannedSets)
+      .where(and(eq(plannedSets.exerciseSlotId, slotId), eq(plannedSets.trainingBlockId, blockId))),
+    slotVariantId(db, slotId),
+  ]);
+  const statements = prescriptionStatements(
+    db,
+    slotId,
+    blockId,
+    variantId,
+    existing,
+    input.targetReps,
+  );
   if (!statements.ok) {
     return fail(statements.error);
   }
@@ -711,13 +799,15 @@ export async function setUniformPrescription(
   if (slot.isPeriodized) {
     return fail('slot-periodized');
   }
-  const [blockIds, existing] = await Promise.all([
+  const [blockIds, existing, variantId] = await Promise.all([
     orderedBlockIds(db, slot.programId),
     existingPlannedSets(db, slotId),
+    slotVariantId(db, slotId),
   ]);
   const statements = uniformPrescriptionStatements(
     db,
     slotId,
+    variantId,
     blockIds,
     existing,
     input.targetReps,
@@ -747,11 +837,12 @@ export async function setSlotPeriodization(
           .update(plannedSets)
           .set({ lastWeightGrams: null })
           .where(eq(plannedSets.exerciseSlotId, slotId)),
+        deleteParkedWeightsOfSlot(db, slotId),
       ]);
     }
     return getProgram(db, profileId, slot.programId);
   }
-  const [blockIds, existing, [cycle]] = await Promise.all([
+  const [blockIds, existing, [cycle], variantId, parked] = await Promise.all([
     orderedBlockIds(db, slot.programId),
     existingPlannedSets(db, slotId),
     db
@@ -759,10 +850,13 @@ export async function setSlotPeriodization(
       .from(cycles)
       .where(eq(cycles.programId, slot.programId))
       .limit(1),
+    slotVariantId(db, slotId),
+    parkedWeightsOfSlot(db, slotId),
   ]);
   const statements = uniformPrescriptionStatements(
     db,
     slotId,
+    variantId,
     blockIds,
     existing,
     input.targetReps,
@@ -770,7 +864,18 @@ export async function setSlotPeriodization(
   if (!statements.ok) {
     return fail(statements.error);
   }
-  const carried = carriedWeightsBySet(blockIds, cycle?.currentBlockId ?? '', existing);
+  const currentBlockId = cycle?.currentBlockId ?? '';
+  const carried = carriedWeightsBySet(blockIds, currentBlockId, existing);
+  const carriedParked = [...groupByVariant(parked)].flatMap(([parkedVariantId, rows]) =>
+    [...carriedWeightsBySet(blockIds, currentBlockId, rows)]
+      .filter(([setNumber]) => setNumber <= input.targetReps.length)
+      .map(([setNumber, lastWeightGrams]) =>
+        parkWeightOnSetNumber(db, slotId, setNumber, {
+          variantId: parkedVariantId,
+          lastWeightGrams,
+        }),
+      ),
+  );
   await runBatch(db, [
     db.update(exerciseSlots).set({ isPeriodized: false }).where(eq(exerciseSlots.id, slotId)),
     ...statements.value,
@@ -780,8 +885,51 @@ export async function setSlotPeriodization(
         .set({ lastWeightGrams: carried.get(index + 1) ?? null })
         .where(and(eq(plannedSets.exerciseSlotId, slotId), eq(plannedSets.setNumber, index + 1))),
     ),
+    deleteParkedWeightsOfSlot(db, slotId),
+    ...carriedParked,
   ]);
   return getProgram(db, profileId, slot.programId);
+}
+
+type SlotParkedWeight = ParkedWeight & { trainingBlockId: string; setNumber: number };
+
+async function parkedWeightsOfSlot(db: Database, slotId: string): Promise<SlotParkedWeight[]> {
+  return db
+    .select({
+      variantId: plannedSetVariantWeights.variantId,
+      lastWeightGrams: plannedSetVariantWeights.lastWeightGrams,
+      trainingBlockId: plannedSets.trainingBlockId,
+      setNumber: plannedSets.setNumber,
+    })
+    .from(plannedSetVariantWeights)
+    .innerJoin(plannedSets, eq(plannedSets.id, plannedSetVariantWeights.plannedSetId))
+    .where(eq(plannedSets.exerciseSlotId, slotId));
+}
+
+function groupByVariant(parked: readonly SlotParkedWeight[]): Map<string, SlotParkedWeight[]> {
+  const byVariant = new Map<string, SlotParkedWeight[]>();
+  for (const row of parked) {
+    byVariant.set(row.variantId, [...(byVariant.get(row.variantId) ?? []), row]);
+  }
+  return byVariant;
+}
+
+function parkWeightOnSetNumber(
+  db: Database,
+  slotId: string,
+  setNumber: number,
+  parked: ParkedWeight,
+): Statement {
+  return db.insert(plannedSetVariantWeights).select(
+    db
+      .select({
+        plannedSetId: plannedSets.id,
+        variantId: sql<string>`${parked.variantId}`.as('variant_id'),
+        lastWeightGrams: sql<number>`${parked.lastWeightGrams}`.as('last_weight_grams'),
+      })
+      .from(plannedSets)
+      .where(and(eq(plannedSets.exerciseSlotId, slotId), eq(plannedSets.setNumber, setNumber))),
+  );
 }
 
 export async function replaceSlotExercise(
@@ -822,14 +970,16 @@ export async function replaceSlotExercise(
   if (!usable.ok) {
     return fail(usable.error);
   }
+  const variantId = await oldestActiveVariantId(db, input.exerciseId);
   await runBatch(db, [
     db
       .update(exerciseSlots)
       .set({ exerciseId: input.exerciseId })
       .where(eq(exerciseSlots.id, slotId)),
+    deleteParkedWeightsOfSlot(db, slotId),
     db
       .update(plannedSets)
-      .set({ lastWeightGrams: null })
+      .set({ lastWeightGrams: null, variantId })
       .where(eq(plannedSets.exerciseSlotId, slotId)),
   ]);
   return getProgram(db, profileId, programId);
