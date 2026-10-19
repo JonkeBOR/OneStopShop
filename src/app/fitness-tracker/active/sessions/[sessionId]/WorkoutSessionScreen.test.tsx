@@ -24,6 +24,7 @@ function loggedSet(overrides: Partial<SetLog> = {}): SetLog {
     setNumber: 1,
     reps: 12,
     weightKg: 65,
+    variantId: null,
     context: {
       programId: 'pr',
       cycleId: 'c1',

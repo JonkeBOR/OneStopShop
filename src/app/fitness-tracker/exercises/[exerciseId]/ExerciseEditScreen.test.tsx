@@ -28,6 +28,7 @@ function usage(overrides: Partial<ExerciseUsage> = {}): ExerciseUsage {
     ],
     hasSetLogs: true,
     bodyParts: [{ bodyPart: 'chest', role: 'primary' }],
+    variants: [],
     ...overrides,
   };
 }

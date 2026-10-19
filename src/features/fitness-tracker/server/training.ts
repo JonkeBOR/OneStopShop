@@ -375,6 +375,7 @@ export async function logSet(
     workoutSessionId: session.id,
     pass: session.pass,
     blockNumber: target.blockNumber,
+    variantId: null,
   };
   await runBatch(db, [
     db.insert(setLogs).values(row),

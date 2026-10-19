@@ -1,0 +1,397 @@
+import { and, asc, eq, inArray } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { Program } from '../domain/types';
+import { runBatch } from './batch';
+import { ensureProfile } from './profile';
+import { exerciseVariants, plannedSets, plannedSetVariantWeights, setLogs } from './schema';
+import { createProgramFromSpec, expectOk } from './storage-test-support';
+import { openTestDatabase, type TestDatabase } from './storage-test-database';
+import { addVariant, listActiveVariants, removeVariant, swapVariantStatements } from './variants';
+
+describe('exercise variants', () => {
+  let testDatabase: TestDatabase;
+  let profileId: string;
+  const now = new Date('2026-10-20T10:00:00Z');
+  const later = new Date('2026-10-20T11:00:00Z');
+  const latest = new Date('2026-10-20T12:00:00Z');
+
+  beforeAll(async () => {
+    testDatabase = await openTestDatabase();
+  });
+
+  afterAll(async () => {
+    await testDatabase.dispose();
+  });
+
+  beforeEach(async () => {
+    profileId = (await ensureProfile(testDatabase.db, crypto.randomUUID(), now)).id;
+  });
+
+  async function squatProgram(owner = profileId): Promise<Program> {
+    return createProgramFromSpec(
+      testDatabase.db,
+      owner,
+      {
+        blockCount: 2,
+        workouts: [
+          {
+            name: 'Lower A',
+            slots: [
+              { exercise: 'Squat', targetReps: [5, 5] },
+              { exercise: 'Curl', targetReps: [10] },
+            ],
+          },
+          { name: 'Lower B', slots: [{ exercise: 'Squat', targetReps: [8], isPeriodized: false }] },
+        ],
+      },
+      now,
+    );
+  }
+
+  function slotsOf(program: Program, exerciseName: string) {
+    return program.workouts
+      .flatMap((workout) => workout.slots)
+      .filter((slot) => slot.exercise.name === exerciseName);
+  }
+
+  function exerciseIdOf(program: Program, exerciseName: string): string {
+    return slotsOf(program, exerciseName)[0]?.exercise.id ?? '';
+  }
+
+  function plannedSetIdsOf(program: Program, exerciseName: string): string[] {
+    return slotsOf(program, exerciseName).flatMap((slot) =>
+      slot.prescriptions.flatMap((prescription) => prescription.plannedSets.map((set) => set.id)),
+    );
+  }
+
+  async function plannedSetRows(ids: string[]) {
+    return testDatabase.db
+      .select({
+        id: plannedSets.id,
+        variantId: plannedSets.variantId,
+        lastWeightGrams: plannedSets.lastWeightGrams,
+      })
+      .from(plannedSets)
+      .where(inArray(plannedSets.id, ids))
+      .orderBy(asc(plannedSets.id));
+  }
+
+  async function parkedRows(ids: string[]) {
+    return testDatabase.db
+      .select()
+      .from(plannedSetVariantWeights)
+      .where(inArray(plannedSetVariantWeights.plannedSetId, ids))
+      .orderBy(asc(plannedSetVariantWeights.plannedSetId));
+  }
+
+  async function setWeights(ids: string[], lastWeightGrams: number | null): Promise<void> {
+    await testDatabase.db
+      .update(plannedSets)
+      .set({ lastWeightGrams })
+      .where(inArray(plannedSets.id, ids));
+  }
+
+  async function park(ids: string[], variantId: string, lastWeightGrams: number): Promise<void> {
+    await testDatabase.db
+      .insert(plannedSetVariantWeights)
+      .values(ids.map((plannedSetId) => ({ plannedSetId, variantId, lastWeightGrams })));
+  }
+
+  async function logSetWith(program: Program, variantId: string): Promise<void> {
+    const slot = slotsOf(program, 'Squat')[0];
+    await testDatabase.db.insert(setLogs).values({
+      id: crypto.randomUUID(),
+      profileId,
+      exerciseId: slot?.exercise.id ?? '',
+      performedAt: now,
+      setNumber: 1,
+      reps: 5,
+      weightGrams: 40000,
+      programId: program.id,
+      cycleId: program.cycle.id,
+      trainingBlockId: program.blocks[0]?.id ?? '',
+      workoutId: program.workouts[0]?.id ?? '',
+      exerciseSlotId: slot?.id ?? '',
+      workoutSessionId: crypto.randomUUID(),
+      pass: 1,
+      blockNumber: 1,
+      variantId,
+    });
+  }
+
+  async function variantRow(variantId: string) {
+    const [row] = await testDatabase.db
+      .select()
+      .from(exerciseVariants)
+      .where(eq(exerciseVariants.id, variantId));
+    return row;
+  }
+
+  async function activeNames(exerciseId: string): Promise<string[]> {
+    const variants = await listActiveVariants(testDatabase.db, [exerciseId]);
+    return (variants.get(exerciseId) ?? []).map((variant) => variant.name);
+  }
+
+  it('adding the first variant keeps the slot’s last weights and selects it on every planned set of every slot of that exercise', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatSets = plannedSetIdsOf(program, 'Squat');
+    const curlSets = plannedSetIdsOf(program, 'Curl');
+    await setWeights(squatSets.slice(0, 2), 40000);
+
+    const variant = expectOk(
+      await addVariant(db, profileId, exerciseIdOf(program, 'Squat'), { name: ' Barbell ' }, now),
+    );
+
+    expect(variant).toEqual({ id: variant.id, name: 'Barbell' });
+    expect(squatSets).toHaveLength(6);
+    const rows = await plannedSetRows(squatSets);
+    expect(rows.every((row) => row.variantId === variant.id)).toBe(true);
+    expect(rows.filter((row) => row.lastWeightGrams === 40000).map((row) => row.id)).toEqual(
+      [...squatSets.slice(0, 2)].sort(),
+    );
+    expect(rows.filter((row) => row.lastWeightGrams === null)).toHaveLength(4);
+    expect((await plannedSetRows(curlSets)).map((row) => row.variantId)).toEqual([null, null]);
+    expect(await parkedRows(squatSets)).toEqual([]);
+  });
+
+  it('adding a second variant leaves the selection and weights alone', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    const squatSets = plannedSetIdsOf(program, 'Squat');
+    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    await setWeights(squatSets, 40000);
+    const before = await plannedSetRows(squatSets);
+
+    const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
+
+    expect(await plannedSetRows(squatSets)).toEqual(before);
+    expect(before.every((row) => row.variantId === barbell.id)).toBe(true);
+    expect(await parkedRows(squatSets)).toEqual([]);
+    expect((await listActiveVariants(db, [squatId])).get(squatId)).toEqual([barbell, smith]);
+  });
+
+  it('refuses a name already used by an active variant of the exercise, ignoring case', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+
+    expect(await addVariant(db, profileId, squatId, { name: '  BARBELL ' }, later)).toEqual({
+      ok: false,
+      error: 'name-taken',
+    });
+    expect(await addVariant(db, profileId, squatId, { name: '  ' }, later)).toEqual({
+      ok: false,
+      error: 'name-required',
+    });
+    expect(await addVariant(db, profileId, squatId, { name: 'a'.repeat(101) }, later)).toEqual({
+      ok: false,
+      error: 'name-too-long',
+    });
+    expect(await activeNames(squatId)).toEqual(['Barbell']);
+    expectOk(
+      await addVariant(db, profileId, exerciseIdOf(program, 'Curl'), { name: 'Barbell' }, later),
+    );
+  });
+
+  it('a removed variant’s name can be used again', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    await logSetWith(program, barbell.id);
+    expectOk(await removeVariant(db, profileId, squatId, barbell.id, later));
+
+    const again = expectOk(await addVariant(db, profileId, squatId, { name: 'barbell' }, latest));
+
+    expect(again.id).not.toBe(barbell.id);
+    expect(await activeNames(squatId)).toEqual(['barbell']);
+  });
+
+  it('removing a variant with logged sets retires it and hides it from listActiveVariants', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    const squatSets = plannedSetIdsOf(program, 'Squat');
+    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
+    await setWeights(squatSets, 40000);
+    await park(squatSets, smith.id, 30000);
+    await logSetWith(program, smith.id);
+
+    expect(await removeVariant(db, profileId, squatId, smith.id, latest)).toEqual({
+      ok: true,
+      value: { removal: 'retire' },
+    });
+
+    expect((await variantRow(smith.id))?.removedAt).toEqual(latest);
+    expect(await activeNames(squatId)).toEqual(['Barbell']);
+    expect(await parkedRows(squatSets)).toEqual([]);
+    const rows = await plannedSetRows(squatSets);
+    expect(rows.every((row) => row.variantId === barbell.id && row.lastWeightGrams === 40000)).toBe(
+      true,
+    );
+  });
+
+  it('removing a variant without logged sets deletes it', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
+
+    expect(await removeVariant(db, profileId, squatId, smith.id, latest)).toEqual({
+      ok: true,
+      value: { removal: 'delete' },
+    });
+
+    expect(await variantRow(smith.id)).toBeUndefined();
+    expect(await activeNames(squatId)).toEqual(['Barbell']);
+  });
+
+  it('removing the selected variant falls back to the oldest remaining variant and its parked weights', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    const squatSets = plannedSetIdsOf(program, 'Squat');
+    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
+    const goblet = expectOk(await addVariant(db, profileId, squatId, { name: 'Goblet' }, latest));
+    await setWeights(squatSets, 40000);
+    await park(squatSets, smith.id, 30000);
+    await park(squatSets, goblet.id, 20000);
+    await logSetWith(program, barbell.id);
+
+    expectOk(await removeVariant(db, profileId, squatId, barbell.id, latest));
+
+    const rows = await plannedSetRows(squatSets);
+    expect(rows.every((row) => row.variantId === smith.id && row.lastWeightGrams === 30000)).toBe(
+      true,
+    );
+    const parked = await parkedRows(squatSets);
+    expect(
+      parked.every((row) => row.variantId === goblet.id && row.lastWeightGrams === 20000),
+    ).toBe(true);
+    expect(parked).toHaveLength(squatSets.length);
+  });
+
+  it('removing the last variant leaves the slot without a variant or weights, and the next add transfers again', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    const squatSets = plannedSetIdsOf(program, 'Squat');
+    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    await setWeights(squatSets, 40000);
+
+    expectOk(await removeVariant(db, profileId, squatId, barbell.id, later));
+
+    expect(
+      (await plannedSetRows(squatSets)).every(
+        (row) => row.variantId === null && row.lastWeightGrams === null,
+      ),
+    ).toBe(true);
+    expect(await activeNames(squatId)).toEqual([]);
+
+    await setWeights(squatSets.slice(0, 1), 50000);
+    const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, latest));
+
+    const rows = await plannedSetRows(squatSets);
+    expect(rows.every((row) => row.variantId === smith.id)).toBe(true);
+    expect(rows.find((row) => row.id === squatSets[0])?.lastWeightGrams).toBe(50000);
+  });
+
+  it('another profile’s exercise or variant is not-found and nothing changes', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    const curlId = exerciseIdOf(program, 'Curl');
+    const squatSets = plannedSetIdsOf(program, 'Squat');
+    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
+    await logSetWith(program, smith.id);
+    expectOk(await removeVariant(db, profileId, squatId, smith.id, later));
+    const otherProfileId = (await ensureProfile(db, crypto.randomUUID(), now)).id;
+    const before = await plannedSetRows(squatSets);
+
+    expect(await addVariant(db, otherProfileId, squatId, { name: 'Goblet' }, latest)).toEqual({
+      ok: false,
+      error: 'not-found',
+    });
+    expect(
+      await addVariant(db, profileId, crypto.randomUUID(), { name: 'Goblet' }, latest),
+    ).toEqual({ ok: false, error: 'not-found' });
+    expect(await removeVariant(db, otherProfileId, squatId, barbell.id, latest)).toEqual({
+      ok: false,
+      error: 'not-found',
+    });
+    expect(await removeVariant(db, profileId, curlId, barbell.id, latest)).toEqual({
+      ok: false,
+      error: 'not-found',
+    });
+    expect(await removeVariant(db, profileId, squatId, smith.id, latest)).toEqual({
+      ok: false,
+      error: 'not-found',
+    });
+
+    expect(await activeNames(squatId)).toEqual(['Barbell']);
+    expect((await variantRow(barbell.id))?.removedAt).toBeNull();
+    expect((await variantRow(smith.id))?.removedAt).toEqual(later);
+    expect(await plannedSetRows(squatSets)).toEqual(before);
+  });
+
+  it('switching with parkCurrent parks the current weights and restores the target’s', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    const slot = slotsOf(program, 'Squat')[0];
+    const slotSets = (slot?.prescriptions ?? []).flatMap((prescription) =>
+      prescription.plannedSets.map((set) => set.id),
+    );
+    const otherSets = plannedSetIdsOf(program, 'Squat').filter((id) => !slotSets.includes(id));
+    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
+    await setWeights(slotSets.slice(0, 2), 40000);
+    await setWeights(slotSets.slice(2), null);
+    await park(slotSets.slice(1, 2), smith.id, 30000);
+    const scope = eq(plannedSets.exerciseSlotId, slot?.id ?? '');
+
+    await runBatch(db, swapVariantStatements(db, scope, smith.id, { parkCurrent: true }));
+
+    const rows = await plannedSetRows(slotSets);
+    expect(rows.every((row) => row.variantId === smith.id)).toBe(true);
+    expect(Object.fromEntries(rows.map((row) => [row.id, row.lastWeightGrams]))).toEqual(
+      Object.fromEntries(slotSets.map((id, index) => [id, index === 1 ? 30000 : null])),
+    );
+    const parked = await parkedRows(slotSets);
+    expect(parked.map((row) => [row.plannedSetId, row.variantId, row.lastWeightGrams])).toEqual(
+      [...slotSets.slice(0, 2)].sort().map((id) => [id, barbell.id, 40000]),
+    );
+    expect((await plannedSetRows(otherSets)).every((row) => row.variantId === barbell.id)).toBe(
+      true,
+    );
+
+    await runBatch(db, swapVariantStatements(db, scope, barbell.id, { parkCurrent: true }));
+
+    const restored = await plannedSetRows(slotSets);
+    expect(
+      Object.fromEntries(restored.map((row) => [row.id, [row.variantId, row.lastWeightGrams]])),
+    ).toEqual(
+      Object.fromEntries(slotSets.map((id, index) => [id, [barbell.id, index < 2 ? 40000 : null]])),
+    );
+    const reparked = await db
+      .select()
+      .from(plannedSetVariantWeights)
+      .where(
+        and(
+          inArray(plannedSetVariantWeights.plannedSetId, slotSets),
+          eq(plannedSetVariantWeights.variantId, smith.id),
+        ),
+      );
+    expect(reparked.map((row) => [row.plannedSetId, row.lastWeightGrams])).toEqual([
+      [slotSets[1], 30000],
+    ]);
+    expect(await parkedRows(slotSets)).toHaveLength(1);
+  });
+});

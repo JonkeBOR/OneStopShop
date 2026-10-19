@@ -5,6 +5,8 @@ export type Profile = { id: string };
 
 export type Exercise = { id: string; name: string; isArchived: boolean };
 
+export type ExerciseVariant = { id: string; name: string };
+
 export type BodyPartView = { id: BodyPart; name: string };
 
 export type SessionStatus = 'in_progress' | 'finished';
@@ -67,6 +69,7 @@ export type SetLog = {
   setNumber: number;
   reps: number;
   weightKg: number | null;
+  variantId: string | null;
   context: SetLogContext;
 };
 
@@ -127,4 +130,5 @@ export type ExerciseUsage = {
   slots: { programId: string; programName: string; workoutId: string; workoutName: string }[];
   hasSetLogs: boolean;
   bodyParts: BodyPartLink[];
+  variants: ExerciseVariant[];
 };

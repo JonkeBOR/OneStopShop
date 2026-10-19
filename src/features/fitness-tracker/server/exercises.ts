@@ -9,6 +9,7 @@ import { isUniqueConstraintViolation } from './batch';
 import { inChartOrder } from './body-parts';
 import { toExercise } from './mapping';
 import { exerciseBodyParts, exerciseSlots, exercises, programs, setLogs, workouts } from './schema';
+import { listActiveVariants } from './variants';
 
 type NameError = 'name-required' | 'name-too-long' | 'name-taken';
 
@@ -176,7 +177,7 @@ export async function getExerciseUsage(
   if (!exercise) {
     return fail('not-found');
   }
-  const [slots, [log], links] = await Promise.all([
+  const [slots, [log], links, variants] = await Promise.all([
     db
       .selectDistinct({
         programId: programs.id,
@@ -199,6 +200,7 @@ export async function getExerciseUsage(
       .select({ bodyPart: exerciseBodyParts.bodyPartId, role: exerciseBodyParts.role })
       .from(exerciseBodyParts)
       .where(eq(exerciseBodyParts.exerciseId, exerciseId)),
+    listActiveVariants(db, [exerciseId]),
   ]);
   return succeed({
     exercise: toExercise(exercise),
@@ -210,5 +212,6 @@ export async function getExerciseUsage(
     })),
     hasSetLogs: log !== undefined,
     bodyParts: inChartOrder(links, (link) => link.bodyPart),
+    variants: variants.get(exerciseId) ?? [],
   });
 }

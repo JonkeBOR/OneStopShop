@@ -18,6 +18,7 @@ function setLog(overrides: {
     setNumber: 1,
     reps: overrides.reps,
     weightKg: overrides.weightKg,
+    variantId: null,
     context: {
       programId: 'p',
       cycleId: `c${overrides.pass}`,
