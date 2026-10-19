@@ -17,7 +17,7 @@ function usage(overrides: Partial<ExerciseUsage> = {}): ExerciseUsage {
       { programId: 'p2', programName: 'Cut', workoutId: 'w9', workoutName: 'Full body' },
     ],
     hasSetLogs: true,
-    bodyParts: ['chest'],
+    bodyParts: [{ bodyPart: 'chest', role: 'primary' }],
     ...overrides,
   };
 }

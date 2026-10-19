@@ -8,7 +8,7 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
-import { bodyPartIds } from '../domain/body-part';
+import { bodyPartIds, bodyPartRoles } from '../domain/body-part';
 
 export const sessionStatuses = ['in_progress', 'finished'] as const;
 
@@ -50,6 +50,7 @@ export const exerciseBodyParts = sqliteTable(
     bodyPartId: text('body_part_id', { enum: bodyPartIds })
       .notNull()
       .references(() => bodyParts.id, { onDelete: 'restrict' }),
+    role: text('role', { enum: bodyPartRoles }).notNull().default('primary'),
   },
   (table) => [primaryKey({ columns: [table.exerciseId, table.bodyPartId] })],
 );

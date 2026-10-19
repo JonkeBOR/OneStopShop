@@ -1,4 +1,4 @@
-import type { BodyPart } from './body-part';
+import type { BodyPart, BodyPartLink } from './body-part';
 import type { BlockStatus } from './progression';
 
 export type Profile = { id: string };
@@ -126,5 +126,5 @@ export type ExerciseUsage = {
   exercise: Exercise;
   slots: { programId: string; programName: string; workoutId: string; workoutName: string }[];
   hasSetLogs: boolean;
-  bodyParts: BodyPart[];
+  bodyParts: BodyPartLink[];
 };

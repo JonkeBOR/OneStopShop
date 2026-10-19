@@ -57,6 +57,13 @@
       "when": 1792419567082,
       "tag": "0007_body_parts_data",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1792439206081,
+      "tag": "0008_body_part_roles",
+      "breakpoints": true
     }
   ]
 }
