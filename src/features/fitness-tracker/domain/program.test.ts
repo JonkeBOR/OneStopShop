@@ -36,6 +36,8 @@ describe('draftsForNewBlock', () => {
         setNumber: 1,
         targetReps: 12,
         lastWeightGrams: null,
+        variantId: null,
+        parkedWeights: [],
       },
       {
         exerciseSlotId: 's1',
@@ -43,6 +45,8 @@ describe('draftsForNewBlock', () => {
         setNumber: 2,
         targetReps: 10,
         lastWeightGrams: null,
+        variantId: null,
+        parkedWeights: [],
       },
       {
         exerciseSlotId: 's2',
@@ -50,6 +54,8 @@ describe('draftsForNewBlock', () => {
         setNumber: 1,
         targetReps: 8,
         lastWeightGrams: null,
+        variantId: null,
+        parkedWeights: [],
       },
     ]);
   });
@@ -67,6 +73,8 @@ describe('draftsForNewBlock', () => {
         setNumber: 1,
         targetReps: 10,
         lastWeightGrams: 60000,
+        variantId: null,
+        parkedWeights: [],
       },
       {
         exerciseSlotId: 's1',
@@ -74,6 +82,43 @@ describe('draftsForNewBlock', () => {
         setNumber: 2,
         targetReps: 10,
         lastWeightGrams: null,
+        variantId: null,
+        parkedWeights: [],
+      },
+    ]);
+  });
+
+  it('copies the variant and parked weights onto the drafts of a slot', () => {
+    expect(
+      draftsForNewBlock(
+        [
+          {
+            slotId: 's1',
+            targetReps: [10, 8],
+            variantId: 'v1',
+            parkedWeightsBySet: [[{ variantId: 'v2', lastWeightGrams: 50000 }], []],
+          },
+        ],
+        'b2',
+      ),
+    ).toEqual([
+      {
+        exerciseSlotId: 's1',
+        trainingBlockId: 'b2',
+        setNumber: 1,
+        targetReps: 10,
+        lastWeightGrams: null,
+        variantId: 'v1',
+        parkedWeights: [{ variantId: 'v2', lastWeightGrams: 50000 }],
+      },
+      {
+        exerciseSlotId: 's1',
+        trainingBlockId: 'b2',
+        setNumber: 2,
+        targetReps: 8,
+        lastWeightGrams: null,
+        variantId: 'v1',
+        parkedWeights: [],
       },
     ]);
   });

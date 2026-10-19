@@ -306,4 +306,6 @@ export const fitnessErrorStrings: Record<FitnessErrorCode, string> = {
   'session-not-in-progress': 'That workout is already finished. The page has been refreshed.',
   'planned-set-not-in-session': 'That set is not part of this workout.',
   'set-already-logged': 'That set is already logged. The page has been refreshed.',
+  'variant-locked':
+    'A set is already logged for this exercise, so its variant cannot be changed in this workout.',
 };

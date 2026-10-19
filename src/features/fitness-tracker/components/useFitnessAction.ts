@@ -10,6 +10,7 @@ type Method = 'POST' | 'PATCH' | 'PUT' | 'DELETE';
 const staleViewCodes: readonly FitnessErrorCode[] = [
   'set-already-logged',
   'session-not-in-progress',
+  'variant-locked',
 ];
 
 export function errorCodeOf(body: unknown): FitnessErrorCode {
