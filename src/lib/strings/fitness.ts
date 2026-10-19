@@ -1,5 +1,9 @@
 import type { FitnessErrorCode } from '@/features/fitness-tracker/domain/errors';
 
+function setCount(sets: number): string {
+  return sets === 1 ? '1 set' : `${sets} sets`;
+}
+
 export const fitnessStrings = {
   common: {
     cancel: 'Cancel',
@@ -254,6 +258,12 @@ export const fitnessStrings = {
   },
   programVolume: {
     heading: 'Weekly volume',
+    blockLabel: 'Block',
+    listLabel: 'Sets per body part',
+    chartLabel: (blockTitle: string) => `Weekly volume, ${blockTitle}`,
+    levels: { none: 'None', low: 'Low', target: 'On target', high: 'High' },
+    setCount,
+    row: (name: string, sets: number, level: string) => `${name} — ${setCount(sets)} · ${level}`,
   },
 } as const;
 

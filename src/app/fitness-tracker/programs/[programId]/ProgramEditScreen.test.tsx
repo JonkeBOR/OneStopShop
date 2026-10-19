@@ -1,8 +1,15 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { programFixture } from '@/features/fitness-tracker/components/test-fixtures';
+import { bodyPartIds } from '@/features/fitness-tracker/domain/body-part';
+import type { BodyPartView } from '@/features/fitness-tracker/domain/types';
 import { fitnessErrorStrings, fitnessStrings } from '@/lib/strings/fitness';
 import { ProgramEditScreen } from './ProgramEditScreen';
+
+const bodyParts: BodyPartView[] = bodyPartIds.map((id) => ({
+  id,
+  name: id === 'chest' ? 'Chest' : `Name of ${id}`,
+}));
 
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 
@@ -37,10 +44,52 @@ describe('ProgramEditScreen', () => {
         program={programFixture()}
         otherActiveProgramName={null}
         inProgressWorkoutIds={[]}
+        bodyPartLinks={new Map()}
+        bodyParts={bodyParts}
         {...overrides}
       />,
     );
   }
+
+  describe('weekly volume', () => {
+    function volumeRows() {
+      const region = screen.getByRole('region', { name: 'Weekly volume' });
+      return within(within(region).getByRole('list', { name: 'Sets per body part' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent);
+    }
+
+    it('sits between blocks and workouts and counts the current block without optional slots', () => {
+      renderScreen({
+        bodyPartLinks: new Map([
+          ['e1', [{ bodyPart: 'chest', role: 'primary' }]],
+          ['e2', [{ bodyPart: 'biceps', role: 'primary' }]],
+        ]),
+      });
+
+      const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+      expect(headings).toEqual([
+        fitnessStrings.programEdit.blocksTitle,
+        'Weekly volume',
+        fitnessStrings.programEdit.workoutsTitle,
+      ]);
+      expect(volumeRows()[0]).toBe('Chest — 3 sets · Low');
+      expect(volumeRows()).toContain('Name of biceps — 0 sets · None');
+    });
+
+    it('shows every body part at none when no exercise is linked', () => {
+      renderScreen();
+
+      expect(volumeRows()).toHaveLength(bodyPartIds.length);
+      expect(volumeRows().every((row) => row?.endsWith('0 sets · None'))).toBe(true);
+    });
+
+    it('is left out when the program has no workouts', () => {
+      renderScreen({ program: programFixture({ workouts: [] }) });
+
+      expect(screen.queryByRole('region', { name: 'Weekly volume' })).toBeNull();
+    });
+  });
 
   it('shows the program name as the heading with a rename form, and links back to Programs', () => {
     renderScreen();

@@ -39,6 +39,7 @@ test('reorders workouts by long-press drag and by keyboard, and the order is kep
 
   const first = page.getByRole('link', { name: names[0] });
   const last = page.getByRole('link', { name: names[2] });
+  await last.scrollIntoViewIfNeeded();
   const from = await first.boundingBox();
   const to = await last.boundingBox();
   if (!from || !to) {
