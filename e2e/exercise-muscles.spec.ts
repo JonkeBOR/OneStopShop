@@ -11,7 +11,7 @@ function savedLink(page: Page, method: 'PUT' | 'DELETE') {
   );
 }
 
-test('marks the muscles an exercise trains on the anatomy chart, and they are kept', async ({
+test('marks the muscles an exercise trains as primary or secondary, and they are kept', async ({
   page,
   context,
 }) => {
@@ -26,22 +26,34 @@ test('marks the muscles an exercise trains on the anatomy chart, and they are ke
 
   const chest = page.getByRole('checkbox', { name: 'Chest', exact: true });
   await expect(chest).toHaveAttribute('aria-checked', 'false');
+  await expect(chest).not.toHaveAttribute('aria-description');
 
-  const linked = savedLink(page, 'PUT');
+  const primary = savedLink(page, 'PUT');
   await chest.locator('path').first().click();
   await expect(chest).toHaveAttribute('aria-checked', 'true');
-  await linked;
+  await expect(chest).toHaveAttribute('aria-description', fitnessStrings.anatomy.roles.primary);
+  await primary;
 
   await page.reload();
-  await expect(chest).toHaveAttribute('aria-checked', 'true');
+  await expect(chest).toHaveAttribute('aria-description', fitnessStrings.anatomy.roles.primary);
   await expect(page.getByRole('checkbox', { name: 'Triceps', exact: true })).toHaveAttribute(
     'aria-checked',
     'false',
   );
 
+  const secondary = savedLink(page, 'PUT');
+  await chest.locator('path').first().click();
+  await expect(chest).toHaveAttribute('aria-checked', 'true');
+  await expect(chest).toHaveAttribute('aria-description', fitnessStrings.anatomy.roles.secondary);
+  await secondary;
+
+  await page.reload();
+  await expect(chest).toHaveAttribute('aria-description', fitnessStrings.anatomy.roles.secondary);
+
   const unlinked = savedLink(page, 'DELETE');
   await chest.locator('path').first().click();
   await expect(chest).toHaveAttribute('aria-checked', 'false');
+  await expect(chest).not.toHaveAttribute('aria-description');
   await unlinked;
 
   await page.reload();

@@ -250,6 +250,10 @@ export const fitnessStrings = {
     chartLabel: 'Anatomy chart',
     summary: (names: readonly string[]) =>
       names.length === 0 ? 'No muscles marked' : `Muscles worked: ${names.join(', ')}`,
+    roles: { primary: 'Primary', secondary: 'Secondary' },
+  },
+  programVolume: {
+    heading: 'Weekly volume',
   },
 } as const;
 
