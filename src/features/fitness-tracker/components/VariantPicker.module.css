@@ -21,6 +21,12 @@
   cursor: not-allowed;
 }
 
+.hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
 .visuallyHidden {
   position: absolute;
   width: 1px;

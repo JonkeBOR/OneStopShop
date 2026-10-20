@@ -29,6 +29,7 @@ export function VariantPicker({
   onSwitched,
 }: VariantPickerProps) {
   const selectId = useId();
+  const hintId = useId();
   const action = useFitnessAction();
   const [choice, setChoice] = useState(selectedVariantId ?? '');
 
@@ -56,6 +57,7 @@ export function VariantPicker({
         className={styles.select}
         value={choice}
         disabled={locked || action.pending}
+        aria-describedby={locked ? hintId : undefined}
         onChange={(event) => void choose(event.target.value)}
       >
         {variants.map((variant) => (
@@ -64,6 +66,11 @@ export function VariantPicker({
           </option>
         ))}
       </select>
+      {locked ? (
+        <p id={hintId} className={styles.hint}>
+          {fitnessStrings.session.variantLockedHint}
+        </p>
+      ) : null}
       <InlineError message={action.errorMessage} />
     </div>
   );

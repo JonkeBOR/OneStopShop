@@ -214,6 +214,8 @@ export const fitnessStrings = {
     nothingToLog: 'There is nothing to log in this workout.',
     variantLabel: (exerciseName: string) => `Variant, ${exerciseName}`,
     slotOptionsLabel: (exerciseName: string) => `Options, ${exerciseName}`,
+    variantLockedHint:
+      'A set is already logged with this variant, so it cannot be changed in this workout.',
   },
   finished: {
     affirmations: [

@@ -3,6 +3,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fitnessErrorStrings, fitnessStrings } from '@/lib/strings/fitness';
 import { VariantPicker } from './VariantPicker';
 
+function descriptionOf(element: Element): string | null {
+  const ids = element.getAttribute('aria-describedby');
+  return ids === null
+    ? null
+    : ids
+        .split(' ')
+        .map((id) => document.getElementById(id)?.textContent ?? '')
+        .join(' ');
+}
+
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
 
 vi.mock('next/navigation', () => ({ useRouter: () => router }));
@@ -92,6 +102,19 @@ describe('VariantPicker', () => {
     renderPicker({ locked: true });
 
     expect(picker().disabled).toBe(true);
+  });
+
+  it('explains why it is disabled once a set is logged', () => {
+    renderPicker({ locked: true });
+
+    expect(descriptionOf(picker())).toBe(fitnessStrings.session.variantLockedHint);
+  });
+
+  it('gives no lock explanation while a switch is still possible', () => {
+    renderPicker();
+
+    expect(screen.queryByText(fitnessStrings.session.variantLockedHint)).toBeNull();
+    expect(descriptionOf(picker())).toBeNull();
   });
 
   it('shows the error and the original choice again when the switch fails', async () => {
