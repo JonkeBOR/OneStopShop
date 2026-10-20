@@ -1,16 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canUseInSlot, exerciseNameKey, exercisesAvailableFor } from './exercise';
-
-describe('exerciseNameKey', () => {
-  it('ignores letter case and surrounding spaces', () => {
-    expect(exerciseNameKey('  Incline BENCH press ')).toBe('incline bench press');
-    expect(exerciseNameKey('Squat')).toBe(exerciseNameKey(' squat'));
-  });
-
-  it('keeps inner spacing, so different words stay different', () => {
-    expect(exerciseNameKey('bench press')).not.toBe(exerciseNameKey('benchpress'));
-  });
-});
+import { canUseInSlot, exercisesAvailableFor } from './exercise';
 
 describe('canUseInSlot', () => {
   it('accepts an active exercise that is not in the workout yet', () => {

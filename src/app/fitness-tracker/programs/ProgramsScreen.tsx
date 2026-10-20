@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { NewProgramForm } from '@/features/fitness-tracker/components/NewProgramForm';
+import { AddLink } from '@/features/fitness-tracker/components/AddLink';
 import { Screen } from '@/features/fitness-tracker/components/Screen';
 import type { ProgramSummary } from '@/features/fitness-tracker/domain/types';
 import { fitnessStrings } from '@/lib/strings/fitness';
@@ -12,8 +12,8 @@ export function ProgramsScreen({ programs }: ProgramsScreenProps) {
     <Screen
       title={fitnessStrings.programs.title}
       back={{ href: '/fitness-tracker', label: fitnessStrings.navigation.toHome }}
+      action={<AddLink href="/fitness-tracker/programs/new" label={fitnessStrings.programs.add} />}
     >
-      <NewProgramForm />
       {programs.length === 0 ? (
         <p className={styles.empty}>{fitnessStrings.programs.empty}</p>
       ) : (

@@ -11,7 +11,6 @@ import { WorkoutList } from '@/features/fitness-tracker/components/WorkoutList';
 import type { BodyPartLink } from '@/features/fitness-tracker/domain/body-part';
 import type { BlockView, BodyPartView, Program } from '@/features/fitness-tracker/domain/types';
 import { weeklyVolume } from '@/features/fitness-tracker/domain/volume';
-import Link from 'next/link';
 import { fitnessStrings } from '@/lib/strings/fitness';
 import styles from './ProgramEditScreen.module.css';
 
@@ -74,17 +73,11 @@ export function ProgramEditScreen({
           <>
             <span className={styles.badge}>{fitnessStrings.programEdit.active}</span>
             <PauseButton triggerLabel={fitnessStrings.programEdit.pause} />
-            <Link className={styles.link} href="/fitness-tracker/active">
-              {fitnessStrings.programEdit.openActiveProgram}
-            </Link>
           </>
         ) : (
           <ActivateButton programId={program.id} otherActiveProgramName={otherActiveProgramName} />
         )}
       </div>
-      {program.isActive ? (
-        <p className={styles.note}>{fitnessStrings.programEdit.futureOnlyNote}</p>
-      ) : null}
 
       <section className={styles.section}>
         <h2 id={blocksHeadingId} className={styles.heading}>

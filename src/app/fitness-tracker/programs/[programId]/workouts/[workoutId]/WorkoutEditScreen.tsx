@@ -1,5 +1,5 @@
 import { AddLink } from '@/features/fitness-tracker/components/AddLink';
-import { NewWorkoutForm } from '@/features/fitness-tracker/components/NewWorkoutForm';
+import { NewNameForm } from '@/features/fitness-tracker/components/NewNameForm';
 import { RenameForm } from '@/features/fitness-tracker/components/RenameForm';
 import { Screen } from '@/features/fitness-tracker/components/Screen';
 import { SlotList } from '@/features/fitness-tracker/components/SlotList';
@@ -30,7 +30,11 @@ export function WorkoutEditScreen({ programId, workout }: WorkoutEditScreenProps
           url={`/api/fitness/workouts/${workout.id}`}
         />
       ) : (
-        <NewWorkoutForm programId={programId} />
+        <NewNameForm
+          label={fitnessStrings.workoutEdit.nameLabel}
+          url={`/api/fitness/programs/${programId}/workouts`}
+          createdHrefPrefix={`/fitness-tracker/programs/${programId}/workouts`}
+        />
       )}
       <section className={styles.section}>
         <div className={styles.headingRow}>

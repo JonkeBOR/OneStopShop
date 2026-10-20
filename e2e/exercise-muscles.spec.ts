@@ -19,9 +19,9 @@ test('marks the muscles an exercise trains as primary or secondary, and they are
   await signIn(context);
 
   await page.goto('/fitness-tracker/exercises', { waitUntil: 'networkidle' });
-  await page.getByLabel(fitnessStrings.exercises.nameLabel, { exact: true }).fill(exerciseName);
-  await page.getByRole('button', { name: fitnessStrings.exercises.add }).click();
-  await page.getByRole('link', { name: exerciseName }).click();
+  await page.getByRole('link', { name: fitnessStrings.exercises.add }).click();
+  await page.getByLabel(fitnessStrings.exerciseEdit.nameLabel, { exact: true }).fill(exerciseName);
+  await page.getByRole('button', { name: fitnessStrings.common.submit }).click();
   await expect(page.getByRole('heading', { level: 1, name: exerciseName })).toBeVisible();
 
   const chest = page.getByRole('checkbox', { name: 'Chest', exact: true });

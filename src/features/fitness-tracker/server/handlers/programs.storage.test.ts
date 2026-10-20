@@ -72,6 +72,24 @@ describe('program handlers', () => {
       expect(program.blocks).toHaveLength(4);
     });
 
+    it('creates a program with one block when no block count is given', async () => {
+      const response = await handleCreateProgram(context({ body: { name: 'Strength' } }));
+
+      expect(response.status).toBe(200);
+      const body = await jsonOf(response);
+      const id = typeof body === 'object' && body !== null && 'id' in body ? String(body.id) : '';
+      expect(expectOk(await getProgram(testDatabase.db, profileId, id)).blocks).toHaveLength(1);
+    });
+
+    it('answers 409 name-taken for a name the profile already uses', async () => {
+      await build({ name: 'Strength', blockCount: 1, workouts: [] });
+
+      const response = await handleCreateProgram(context({ body: { name: 'strength' } }));
+
+      expect(response.status).toBe(409);
+      expect(await jsonOf(response)).toEqual({ error: 'name-taken' });
+    });
+
     it('answers 400 invalid-block-count for no blocks', async () => {
       const response = await handleCreateProgram(
         context({ body: { name: 'Strength', blockCount: 0 } }),

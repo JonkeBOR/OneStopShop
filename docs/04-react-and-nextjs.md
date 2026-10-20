@@ -79,6 +79,25 @@ problem: move the value into state, derive it during render, or drop the effect 
 Effects are for synchronising with something outside React. Data that can be computed during render
 is computed during render, not stored in state and updated in an effect.
 
+## Creating an entity
+
+An entity with anything to set up beyond its name — more fields, or child items such as a program's
+blocks and workouts — is created in two steps. Its list shows an `AddLink`, a plus icon whose
+aria-label comes from the strings module, beside the screen or section title, linking to `…/new`.
+That page has only the name and a Submit button, rendered with `NewNameForm`; its back link cancels
+and nothing is saved. Submit posts the name. The server refuses a duplicate with `name-taken`, shown
+inline, or creates the entity, and the page is replaced by the entity's edit page, where the rest of
+its fields appear. Because the page is replaced, going back from the edit page lands on the list,
+not on the empty form.
+
+Names are unique within their owner — a program or exercise per profile, a workout per program, a
+variant per exercise — and compared with `nameKey`, ignoring letter case and surrounding spaces, on
+rename as well as on create.
+
+An entity that is only a name is added in place with `AddNameForm`, and one that needs no input at
+all is added with `ActionButton`, as a training block is. Quick-creating an exercise from the slot
+form's exercise picker stays inline on purpose: it happens in the middle of another task.
+
 ## Accessibility
 
 `jsx-a11y` recommended rules are on. The app is a Home Screen PWA driven by touch: interactive

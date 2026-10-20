@@ -46,7 +46,7 @@ export async function createProgramFromSpec(
     await createProgram(
       db,
       profileId,
-      { name: spec.name ?? 'Test program', blockCount: spec.blockCount },
+      { name: spec.name ?? `Test program ${crypto.randomUUID()}`, blockCount: spec.blockCount },
       now,
     ),
   );

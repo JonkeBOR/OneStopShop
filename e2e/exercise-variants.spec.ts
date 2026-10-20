@@ -30,6 +30,7 @@ test('an exercise keeps separate last weights per variant, switchable until a se
   page,
   context,
 }) => {
+  test.slow();
   const run = Date.now().toString(36);
   const programName = `Program ${run}`;
   const workoutName = `Day ${run}`;
@@ -52,14 +53,18 @@ test('an exercise keeps separate last weights per variant, switchable until a se
 
   await page.goto('/fitness-tracker');
   await page.getByRole('link', { name: fitnessStrings.home.programsLink }).click();
-  await page.getByLabel(fitnessStrings.programs.nameLabel, { exact: true }).fill(programName);
-  await page.getByLabel(fitnessStrings.programs.blocksLabel, { exact: true }).fill('2');
-  await page.getByRole('button', { name: fitnessStrings.programs.create }).click();
+  await page.getByRole('link', { name: fitnessStrings.programs.add }).click();
+  await page.getByLabel(fitnessStrings.programEdit.nameLabel, { exact: true }).fill(programName);
+  await page.getByRole('button', { name: fitnessStrings.common.submit }).click();
   await expect(page.getByRole('heading', { level: 1, name: programName })).toBeVisible();
+  await page.getByRole('button', { name: fitnessStrings.programEdit.addBlock }).click();
+  await expect(
+    page.getByRole('list', { name: fitnessStrings.programEdit.blocksTitle }).getByRole('listitem'),
+  ).toHaveCount(2);
 
   await page.getByRole('link', { name: fitnessStrings.programEdit.addWorkout }).click();
   await page.getByLabel(fitnessStrings.workoutEdit.nameLabel, { exact: true }).fill(workoutName);
-  await page.getByRole('button', { name: fitnessStrings.workoutEdit.create }).click();
+  await page.getByRole('button', { name: fitnessStrings.common.submit }).click();
   await expect(page.getByRole('heading', { level: 1, name: workoutName })).toBeVisible();
 
   await page.getByRole('link', { name: fitnessStrings.workoutEdit.addExercise }).click();

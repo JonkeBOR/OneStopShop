@@ -4,42 +4,34 @@ import { useRouter } from 'next/navigation';
 import { type FormEvent, useId, useState } from 'react';
 import { fitnessStrings } from '@/lib/strings/fitness';
 import { InlineError } from './InlineError';
-import styles from './NewWorkoutForm.module.css';
+import styles from './NewNameForm.module.css';
+import { readId } from './read-id';
 import { useFitnessAction } from './useFitnessAction';
 
-type NewWorkoutFormProps = { programId: string };
+type NewNameFormProps = { label: string; url: string; createdHrefPrefix: string };
 
-function createdId(body: unknown): string | null {
-  if (typeof body === 'object' && body !== null && 'id' in body && typeof body.id === 'string') {
-    return body.id;
-  }
-  return null;
-}
-
-export function NewWorkoutForm({ programId }: NewWorkoutFormProps) {
+export function NewNameForm({ label, url, createdHrefPrefix }: NewNameFormProps) {
   const inputId = useId();
   const router = useRouter();
   const [name, setName] = useState('');
   const action = useFitnessAction();
 
   function openCreated(body: unknown) {
-    const id = createdId(body);
-    router.replace(
-      id === null
-        ? `/fitness-tracker/programs/${programId}`
-        : `/fitness-tracker/programs/${programId}/workouts/${id}`,
-    );
+    const id = readId(body);
+    if (id !== null) {
+      router.replace(`${createdHrefPrefix}/${id}`);
+    }
   }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    await action.run('POST', `/api/fitness/programs/${programId}/workouts`, { name }, openCreated);
+    await action.run('POST', url, { name }, openCreated);
   }
 
   return (
     <form className={styles.form} onSubmit={(event) => void submit(event)}>
       <label className={styles.label} htmlFor={inputId}>
-        {fitnessStrings.workoutEdit.nameLabel}
+        {label}
       </label>
       <div className={styles.fields}>
         <input
@@ -56,7 +48,7 @@ export function NewWorkoutForm({ programId }: NewWorkoutFormProps) {
           className={styles.submit}
           disabled={action.pending || name.trim() === ''}
         >
-          {fitnessStrings.workoutEdit.create}
+          {fitnessStrings.common.submit}
         </button>
       </div>
       <InlineError message={action.errorMessage} />

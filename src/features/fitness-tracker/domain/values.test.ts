@@ -3,7 +3,9 @@ import {
   formatKg,
   formatShortDate,
   gramsToKg,
+  isNameTaken,
   localDate,
+  nameKey,
   parseCompletedBlock,
   parseKgInput,
   parseLoggedReps,
@@ -72,6 +74,28 @@ describe('parseName', () => {
   it('accepts exactly 100 characters and rejects 101', () => {
     expect(parseName('a'.repeat(100)).ok).toBe(true);
     expect(parseName('a'.repeat(101))).toEqual({ ok: false, error: 'name-too-long' });
+  });
+});
+
+describe('nameKey', () => {
+  it('ignores letter case and surrounding spaces', () => {
+    expect(nameKey('  Incline BENCH press ')).toBe('incline bench press');
+    expect(nameKey('Squat')).toBe(nameKey(' squat'));
+  });
+
+  it('keeps inner spacing, so different words stay different', () => {
+    expect(nameKey('bench press')).not.toBe(nameKey('benchpress'));
+  });
+});
+
+describe('isNameTaken', () => {
+  it('finds a name already used, ignoring letter case and surrounding spaces', () => {
+    expect(isNameTaken(' upper LOWER ', ['5/3/1', 'Upper/Lower', 'Upper lower'])).toBe(true);
+  });
+
+  it('accepts a name nobody uses', () => {
+    expect(isNameTaken('Full body', ['5/3/1', 'Upper lower'])).toBe(false);
+    expect(isNameTaken('Full body', [])).toBe(false);
   });
 });
 

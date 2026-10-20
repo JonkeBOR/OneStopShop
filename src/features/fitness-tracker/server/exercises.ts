@@ -1,10 +1,9 @@
 import 'server-only';
 import { and, asc, eq, isNull, ne } from 'drizzle-orm';
 import type { Database } from '@/lib/server/database';
-import { exerciseNameKey } from '../domain/exercise';
 import { fail, type Result, succeed } from '../domain/result';
 import type { Exercise, ExerciseUsage } from '../domain/types';
-import { parseName } from '../domain/values';
+import { nameKey, parseName } from '../domain/values';
 import { isUniqueConstraintViolation } from './batch';
 import { inChartOrder } from './body-parts';
 import { toExercise } from './mapping';
@@ -35,11 +34,11 @@ export async function addExercise(
   if (!name.ok) {
     return fail(name.error);
   }
-  const nameKey = exerciseNameKey(name.value);
+  const key = nameKey(name.value);
   const [taken] = await db
     .select({ id: exercises.id })
     .from(exercises)
-    .where(and(eq(exercises.profileId, profileId), eq(exercises.nameKey, nameKey)))
+    .where(and(eq(exercises.profileId, profileId), eq(exercises.nameKey, key)))
     .limit(1);
   if (taken) {
     return fail('name-taken');
@@ -48,7 +47,7 @@ export async function addExercise(
     id: crypto.randomUUID(),
     profileId,
     name: name.value,
-    nameKey,
+    nameKey: key,
     archivedAt: null,
     createdAt: now,
   };
@@ -73,14 +72,14 @@ export async function renameExercise(
   if (!name.ok) {
     return fail(name.error);
   }
-  const nameKey = exerciseNameKey(name.value);
+  const key = nameKey(name.value);
   const [taken] = await db
     .select({ id: exercises.id })
     .from(exercises)
     .where(
       and(
         eq(exercises.profileId, profileId),
-        eq(exercises.nameKey, nameKey),
+        eq(exercises.nameKey, key),
         ne(exercises.id, exerciseId),
       ),
     )
@@ -91,7 +90,7 @@ export async function renameExercise(
   try {
     const [row] = await db
       .update(exercises)
-      .set({ name: name.value, nameKey })
+      .set({ name: name.value, nameKey: key })
       .where(and(eq(exercises.id, exerciseId), eq(exercises.profileId, profileId)))
       .returning();
     return row ? succeed(toExercise(row)) : fail('not-found');

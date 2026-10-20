@@ -1,5 +1,5 @@
 import 'server-only';
-import { fail } from '../../domain/result';
+import { fail, succeed } from '../../domain/result';
 import type { FitnessRequestContext } from '../fitness-route';
 import {
   hasKey,
@@ -25,6 +25,8 @@ import {
   renameWorkout,
 } from '../programs';
 
+const defaultBlockCount = 1;
+
 function idParam(context: FitnessRequestContext): string {
   return context.params.id ?? '';
 }
@@ -40,7 +42,9 @@ export async function handleCreateProgram({
     return respond(body);
   }
   const name = readString(body.value, 'name');
-  const blockCount = readNumber(body.value, 'blockCount');
+  const blockCount = hasKey(body.value, 'blockCount')
+    ? readNumber(body.value, 'blockCount')
+    : succeed(defaultBlockCount);
   if (!name.ok) {
     return respond(name);
   }

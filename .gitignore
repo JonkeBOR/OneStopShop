@@ -75,3 +75,4 @@ client_secret_*.json
 
 # Working notes from planning sessions
 docs/superpowers/
+.superpowers/

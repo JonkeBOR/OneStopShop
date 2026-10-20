@@ -1,10 +1,9 @@
 import 'server-only';
 import { and, asc, count, eq, inArray, isNotNull, isNull, type SQL, sql } from 'drizzle-orm';
 import type { Database } from '@/lib/server/database';
-import { exerciseNameKey } from '../domain/exercise';
 import { fail, type Result, succeed } from '../domain/result';
 import type { ExerciseVariant } from '../domain/types';
-import { parseName } from '../domain/values';
+import { nameKey, parseName } from '../domain/values';
 import { decideVariantSwitch, fallbackVariantId, removalOf } from '../domain/variant';
 import { chunkIds, runBatch, type Statement } from './batch';
 import { toExerciseVariant } from './mapping';
@@ -61,19 +60,19 @@ export async function addVariant(
   if (!(await ownsExercise(db, profileId, exerciseId))) {
     return fail('not-found');
   }
-  const nameKey = exerciseNameKey(name.value);
+  const key = nameKey(name.value);
   const active = await db
     .select({ nameKey: exerciseVariants.nameKey })
     .from(exerciseVariants)
     .where(and(eq(exerciseVariants.exerciseId, exerciseId), isNull(exerciseVariants.removedAt)));
-  if (active.some((variant) => variant.nameKey === nameKey)) {
+  if (active.some((variant) => variant.nameKey === key)) {
     return fail('name-taken');
   }
   const row = {
     id: crypto.randomUUID(),
     exerciseId,
     name: name.value,
-    nameKey,
+    nameKey: key,
     createdAt: now,
     removedAt: null,
   };

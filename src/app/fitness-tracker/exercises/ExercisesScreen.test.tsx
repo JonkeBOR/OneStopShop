@@ -1,7 +1,7 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Exercise } from '@/features/fitness-tracker/domain/types';
-import { fitnessErrorStrings, fitnessStrings } from '@/lib/strings/fitness';
+import { fitnessStrings } from '@/lib/strings/fitness';
 import { ExercisesScreen } from './ExercisesScreen';
 
 const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
@@ -94,44 +94,19 @@ describe('ExercisesScreen', () => {
     expect(within(archived).getByText(fitnessStrings.common.archived)).toBeDefined();
   });
 
-  it('FR-005: explains what to do when there are no exercises, and still offers the form', () => {
+  it('FR-005: explains what to do when there are no exercises, and still offers the + link', () => {
     render(<ExercisesScreen exercises={[]} />);
 
     expect(screen.getByText(fitnessStrings.exercises.empty)).toBeDefined();
-    expect(screen.getByRole('button', { name: fitnessStrings.exercises.add })).toBeDefined();
+    expect(screen.getByRole('link', { name: fitnessStrings.exercises.add })).toBeDefined();
   });
 
-  describe('adding an exercise', () => {
-    function add(name: string) {
-      fireEvent.change(screen.getByRole('textbox', { name: fitnessStrings.exercises.nameLabel }), {
-        target: { value: name },
-      });
-      fireEvent.click(screen.getByRole('button', { name: fitnessStrings.exercises.add }));
-    }
+  it('adds an exercise from a + link to its own page, not from a form on the list', () => {
+    render(<ExercisesScreen exercises={exercises} />);
 
-    it('US5 scenario 1: sends the name and refreshes the list', async () => {
-      fetchMock.mockResolvedValue(
-        Response.json({ id: 'e9', name: 'Seal rows', isArchived: false }),
-      );
-      render(<ExercisesScreen exercises={exercises} />);
-
-      add('Seal rows');
-
-      await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
-      expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/fitness/exercises');
-      expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(JSON.stringify({ name: 'Seal rows' }));
-    });
-
-    it('US5 scenario 2: shows a taken name inline', async () => {
-      fetchMock.mockResolvedValue(Response.json({ error: 'name-taken' }, { status: 409 }));
-      render(<ExercisesScreen exercises={exercises} />);
-
-      add('Chins');
-
-      await waitFor(() =>
-        expect(screen.getByRole('alert').textContent).toBe(fitnessErrorStrings['name-taken']),
-      );
-      expect(router.refresh).not.toHaveBeenCalled();
-    });
+    expect(
+      screen.getByRole('link', { name: fitnessStrings.exercises.add }).getAttribute('href'),
+    ).toBe('/fitness-tracker/exercises/new');
+    expect(screen.queryByRole('button', { name: fitnessStrings.common.submit })).toBeNull();
   });
 });

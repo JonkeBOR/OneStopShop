@@ -11,6 +11,7 @@ export const fitnessStrings = {
     optional: 'Optional',
     archived: 'Archived',
     noValue: '—',
+    submit: 'Submit',
   },
   reorder: {
     handleFor: (name: string) => `Reorder ${name}`,
@@ -57,16 +58,15 @@ export const fitnessStrings = {
   },
   programs: {
     title: 'Programs',
-    newProgram: 'New program',
-    nameLabel: 'Name',
-    blocksLabel: 'Blocks',
-    create: 'Create',
-    empty: 'No programs yet. Create one to start training.',
+    add: 'Add program',
+    empty: 'No programs yet. Tap + to add one.',
     summary: (blocks: number, workouts: number) =>
       `${blocks} ${blocks === 1 ? 'block' : 'blocks'} · ${workouts} ${workouts === 1 ? 'workout' : 'workouts'}`,
   },
   programEdit: {
     nameLabel: 'Program name',
+    newTitle: 'New program',
+    nameFirst: 'Name the program, then set up its blocks and workouts.',
     blocksTitle: 'Training blocks',
     blockLabelLabel: (blockNumber: number) => `Label for block ${blockNumber}`,
     addBlock: 'Add block',
@@ -78,8 +78,6 @@ export const fitnessStrings = {
     activateWillPause: (otherName: string) => `${otherName} will be paused and keep its place.`,
     active: 'Active',
     pause: 'Pause program',
-    openActiveProgram: 'Open the active program',
-    futureOnlyNote: 'Changes apply to future workouts.',
     deleteProgram: 'Delete program',
     deleteConfirm:
       'Delete this program, its plan and its place in the program? Your logged sets are kept.',
@@ -100,7 +98,6 @@ export const fitnessStrings = {
   workoutEdit: {
     nameLabel: 'Workout name',
     newTitle: 'New workout',
-    create: 'Create workout',
     nameFirst: 'Name the workout, then add its exercises.',
     slotsTitle: 'Exercises',
     noSlots: 'No exercises yet. Add the first one.',
@@ -235,15 +232,16 @@ export const fitnessStrings = {
   },
   exercises: {
     title: 'Exercises',
-    nameLabel: 'New exercise name',
     add: 'Add exercise',
     filterLabel: 'Filter exercises',
     showArchived: 'Show archived',
-    empty: 'No exercises yet. Add the first one.',
+    empty: 'No exercises yet. Tap + to add one.',
     noMatches: 'No exercises match.',
   },
   exerciseEdit: {
     nameLabel: 'Exercise name',
+    newTitle: 'New exercise',
+    nameFirst: 'Name the exercise, then mark its muscles and add variants.',
     usedIn: 'Used in',
     notUsed: 'Not used in any workout yet.',
     usedItem: (programName: string, workoutName: string) => `${programName} · ${workoutName}`,

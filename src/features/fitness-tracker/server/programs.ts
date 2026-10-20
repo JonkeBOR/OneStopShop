@@ -15,7 +15,7 @@ import {
 import { reevaluateAfterEdit } from '../domain/progression';
 import { fail, type Result, succeed } from '../domain/result';
 import type { Program, ProgramSummary } from '../domain/types';
-import { parseName } from '../domain/values';
+import { isNameTaken, parseName } from '../domain/values';
 import type { ParkedWeight } from '../domain/variant';
 import { chunkIds, chunkRows, runBatch, type Statement } from './batch';
 import { insertCycleStatement, startPassStatements } from './cycle-statements';
@@ -34,7 +34,7 @@ import {
 } from './schema';
 import { listActiveVariants } from './variants';
 
-type NameError = 'name-required' | 'name-too-long';
+type NameError = 'name-required' | 'name-too-long' | 'name-taken';
 type MoveError = 'not-found' | 'invalid-position';
 type TargetsError = 'prescription-needs-a-set' | 'invalid-target';
 type ExistingPlannedSet = {
@@ -100,6 +100,31 @@ async function programIdOfBlock(
     .where(and(eq(trainingBlocks.id, blockId), eq(programs.profileId, profileId)))
     .limit(1);
   return row?.programId ?? null;
+}
+
+async function otherProgramNames(
+  db: Database,
+  profileId: string,
+  exceptProgramId: string | null,
+): Promise<string[]> {
+  const scope =
+    exceptProgramId === null
+      ? eq(programs.profileId, profileId)
+      : and(eq(programs.profileId, profileId), ne(programs.id, exceptProgramId));
+  const rows = await db.select({ name: programs.name }).from(programs).where(scope);
+  return rows.map((row) => row.name);
+}
+
+async function otherWorkoutNames(
+  db: Database,
+  programId: string,
+  exceptWorkoutId: string,
+): Promise<string[]> {
+  const rows = await db
+    .select({ name: workouts.name })
+    .from(workouts)
+    .where(and(eq(workouts.programId, programId), ne(workouts.id, exceptWorkoutId)));
+  return rows.map((row) => row.name);
 }
 
 async function programIdOfWorkout(
@@ -286,6 +311,9 @@ export async function createProgram(
   if (!blockCount.ok) {
     return fail(blockCount.error);
   }
+  if (isNameTaken(name.value, await otherProgramNames(db, profileId, null))) {
+    return fail('name-taken');
+  }
   const programId = crypto.randomUUID();
   const blockRows = Array.from({ length: blockCount.value }, (_, index) => ({
     id: crypto.randomUUID(),
@@ -321,6 +349,9 @@ export async function renameProgram(
   const name = parseName(input.name);
   if (!name.ok) {
     return fail(name.error);
+  }
+  if (isNameTaken(name.value, await otherProgramNames(db, profileId, programId))) {
+    return fail('name-taken');
   }
   const [row] = await db
     .update(programs)
@@ -459,6 +490,10 @@ export async function addWorkout(
   if (!rows) {
     return fail('not-found');
   }
+  const workoutNames = rows.workouts.map((workout) => workout.name);
+  if (isNameTaken(name.value, workoutNames)) {
+    return fail('name-taken');
+  }
   await db.insert(workouts).values({
     id: crypto.randomUUID(),
     programId,
@@ -481,6 +516,9 @@ export async function renameWorkout(
   const programId = await programIdOfWorkout(db, profileId, workoutId);
   if (programId === null) {
     return fail('not-found');
+  }
+  if (isNameTaken(name.value, await otherWorkoutNames(db, programId, workoutId))) {
+    return fail('name-taken');
   }
   await db.update(workouts).set({ name: name.value }).where(eq(workouts.id, workoutId));
   return getProgram(db, profileId, programId);
