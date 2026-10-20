@@ -14,6 +14,13 @@
   font: inherit;
 }
 
+.select:disabled {
+  border-style: dashed;
+  background-color: var(--color-surface-muted);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
 .visuallyHidden {
   position: absolute;
   width: 1px;
