@@ -323,6 +323,65 @@ describe('WorkoutSessionScreen', () => {
     });
   });
 
+  describe('the variant picker', () => {
+    const variants = [
+      { id: 'v1', name: 'Barbell' },
+      { id: 'v2', name: 'Dumbbell' },
+    ];
+
+    function withVariants(session: SessionView): SessionView {
+      return {
+        ...session,
+        slots: session.slots.map((slot) =>
+          slot.id === 's1' ? { ...slot, variants, selectedVariantId: 'v1' } : slot,
+        ),
+      };
+    }
+
+    function pickerFor(exerciseName: string) {
+      return screen.queryByRole('combobox', {
+        name: fitnessStrings.session.variantLabel(exerciseName),
+      });
+    }
+
+    it('shows the picker for a slot with variants and not for one without', () => {
+      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
+
+      expect(pickerFor(bench)).not.toBeNull();
+      expect(pickerFor('Curl')).toBeNull();
+    });
+
+    it('disables the picker once a set of the slot is logged', () => {
+      render(<WorkoutSessionScreen session={withFirstSetLogged(withVariants(freshSession()))} />);
+
+      expect(pickerFor(bench)?.hasAttribute('disabled')).toBe(true);
+    });
+
+    it('disables the picker while a set is being logged', () => {
+      fetchMock.mockReturnValue(new Promise<Response>(() => undefined));
+      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
+
+      fireEvent.click(logButton(1));
+
+      expect(pickerFor(bench)?.hasAttribute('disabled')).toBe(true);
+    });
+
+    it('drops the typed weights, and keeps the reps, after switching variant', async () => {
+      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
+      fireEvent.change(weightBox(1), { target: { value: '70' } });
+      fireEvent.change(repsBox(1), { target: { value: '8' } });
+
+      const picker = pickerFor(bench);
+      if (!picker) {
+        throw new Error('The picker is missing');
+      }
+      fireEvent.change(picker, { target: { value: 'v2' } });
+
+      await waitFor(() => expect(weightBox(1).value).toBe(''));
+      expect(repsBox(1).value).toBe('8');
+    });
+  });
+
   describe('a logged set', () => {
     it('FR-019: keeps the row, tinted, with the logged values as text, and no inputs or button', () => {
       render(<WorkoutSessionScreen session={withFirstSetLogged(freshSession())} />);

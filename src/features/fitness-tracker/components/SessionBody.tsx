@@ -7,6 +7,7 @@ import { SetRow } from './SetRow';
 import styles from './SessionBody.module.css';
 import { useSetDrafts } from './useSetDrafts';
 import type { SetLogging } from './useSetLogging';
+import { VariantPicker } from './VariantPicker';
 
 type SessionBodyProps = { session: SessionView; logging: SetLogging };
 
@@ -21,6 +22,7 @@ function SlotSection({
   drafts,
   setDraft,
   clearDraft,
+  clearWeightDrafts,
   logging,
 }: {
   session: SessionView;
@@ -28,6 +30,7 @@ function SlotSection({
   drafts: ReturnType<typeof useSetDrafts>['drafts'];
   setDraft: ReturnType<typeof useSetDrafts>['setDraft'];
   clearDraft: ReturnType<typeof useSetDrafts>['clearDraft'];
+  clearWeightDrafts: ReturnType<typeof useSetDrafts>['clearWeightDrafts'];
   logging: SetLogging;
 }) {
   const headingId = useId();
@@ -44,6 +47,21 @@ function SlotSection({
           <span className={styles.tag}>{fitnessStrings.common.optional}</span>
         ) : null}
       </div>
+      {slot.variants.length > 0 ? (
+        <VariantPicker
+          key={slot.selectedVariantId ?? ''}
+          sessionId={session.id}
+          slotId={slot.id}
+          exerciseName={slot.exercise.name}
+          variants={slot.variants}
+          selectedVariantId={slot.selectedVariantId}
+          locked={
+            slot.loggedSets.length > 0 ||
+            slot.plannedSets.some((set) => logging.optimistic[set.id] !== undefined)
+          }
+          onSwitched={() => clearWeightDrafts(slot.plannedSets.map((set) => set.id))}
+        />
+      ) : null}
       <table className={styles.sets} aria-labelledby={headingId}>
         <thead>
           <tr>
@@ -88,7 +106,7 @@ function SlotSection({
 }
 
 export function SessionBody({ session, logging }: SessionBodyProps) {
-  const { drafts, setDraft, clearDraft } = useSetDrafts(session.id);
+  const { drafts, setDraft, clearDraft, clearWeightDrafts } = useSetDrafts(session.id);
 
   return (
     <>
@@ -103,6 +121,7 @@ export function SessionBody({ session, logging }: SessionBodyProps) {
             drafts={drafts}
             setDraft={setDraft}
             clearDraft={clearDraft}
+            clearWeightDrafts={clearWeightDrafts}
             logging={logging}
           />
         ))
