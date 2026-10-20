@@ -147,7 +147,7 @@ describe('variant handlers', () => {
       );
 
       const response = await switchTo(session.id, slotId, {
-        variantId: session.slots[0]?.selectedVariantId === smith.id ? barbell.id : smith.id,
+        variantId: session.slots[0]?.variant?.id === smith.id ? barbell.id : smith.id,
       });
 
       expect(response.status).toBe(409);

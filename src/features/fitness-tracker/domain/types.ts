@@ -88,8 +88,17 @@ export type SessionSlot = {
   isOptional: boolean;
   plannedSets: SessionPlannedSet[];
   loggedSets: SetLog[];
+  variant: ExerciseVariant | null;
+};
+
+export type SessionSlotSettings = {
+  sessionId: string;
+  status: SessionStatus;
+  exercise: Exercise;
+  plannedSetIds: string[];
   variants: ExerciseVariant[];
   selectedVariantId: string | null;
+  isLocked: boolean;
 };
 
 export type SessionView = {

@@ -19,7 +19,6 @@ type SetRowProps = {
   logged: SetLog | null;
   optimistic: LoggedValues | undefined;
   draft: SetDraft | undefined;
-  disabled: boolean;
   onDraftChange: (patch: SetDraft) => void;
   onLogStarted: (values: LoggedValues) => void;
   onLogSettled: (succeeded: boolean) => void;
@@ -46,7 +45,6 @@ export function SetRow({
   logged,
   optimistic,
   draft,
-  disabled,
   onDraftChange,
   onLogStarted,
   onLogSettled,
@@ -135,7 +133,7 @@ export function SetRow({
             type="button"
             className={styles.log}
             aria-label={fitnessStrings.session.logLabel(plannedSet.setNumber, exerciseName)}
-            disabled={disabled || action.pending}
+            disabled={action.pending}
             onClick={() => void log()}
           >
             <Check className={styles.checkIcon} aria-hidden="true" />

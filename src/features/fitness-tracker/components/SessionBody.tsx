@@ -1,13 +1,14 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { Ellipsis } from 'lucide-react';
+import Link from 'next/link';
+import { useId } from 'react';
 import { fitnessStrings } from '@/lib/strings/fitness';
 import type { SessionSlot, SessionView, SetLog } from '../domain/types';
 import { SetRow } from './SetRow';
 import styles from './SessionBody.module.css';
 import { useSetDrafts } from './useSetDrafts';
 import type { SetLogging } from './useSetLogging';
-import { VariantPicker } from './VariantPicker';
 
 type SessionBodyProps = { session: SessionView; logging: SetLogging };
 
@@ -22,7 +23,6 @@ function SlotSection({
   drafts,
   setDraft,
   clearDraft,
-  clearWeightDrafts,
   logging,
 }: {
   session: SessionView;
@@ -30,11 +30,9 @@ function SlotSection({
   drafts: ReturnType<typeof useSetDrafts>['drafts'];
   setDraft: ReturnType<typeof useSetDrafts>['setDraft'];
   clearDraft: ReturnType<typeof useSetDrafts>['clearDraft'];
-  clearWeightDrafts: ReturnType<typeof useSetDrafts>['clearWeightDrafts'];
   logging: SetLogging;
 }) {
   const headingId = useId();
-  const [switching, setSwitching] = useState(false);
   return (
     <section
       className={slot.isOptional ? styles.optionalSlot : styles.slot}
@@ -44,29 +42,22 @@ function SlotSection({
         <h2 id={headingId} className={styles.exercise}>
           {slot.exercise.name}
         </h2>
+        {slot.variant ? <span className={styles.variant}>{slot.variant.name}</span> : null}
         {slot.isOptional ? (
           <span className={styles.tag}>{fitnessStrings.common.optional}</span>
         ) : null}
+        {slot.variant ? (
+          <Link
+            className={styles.options}
+            href={`/fitness-tracker/active/sessions/${session.id}/slots/${slot.id}`}
+            aria-label={fitnessStrings.session.slotOptionsLabel(slot.exercise.name)}
+          >
+            <span className={styles.optionsCircle}>
+              <Ellipsis className={styles.optionsIcon} aria-hidden="true" />
+            </span>
+          </Link>
+        ) : null}
       </div>
-      {slot.variants.length > 0 ? (
-        <VariantPicker
-          key={slot.selectedVariantId ?? ''}
-          sessionId={session.id}
-          slotId={slot.id}
-          exerciseName={slot.exercise.name}
-          variants={slot.variants}
-          selectedVariantId={slot.selectedVariantId}
-          locked={
-            slot.loggedSets.length > 0 ||
-            slot.plannedSets.some((set) => logging.optimistic[set.id] !== undefined)
-          }
-          onSwitchStart={() => {
-            setSwitching(true);
-            clearWeightDrafts(slot.plannedSets.map((set) => set.id));
-          }}
-          onSwitchSettled={() => setSwitching(false)}
-        />
-      ) : null}
       <table className={styles.sets} aria-labelledby={headingId}>
         <thead>
           <tr>
@@ -90,12 +81,11 @@ function SlotSection({
               key={plannedSet.id}
               sessionId={session.id}
               exerciseName={slot.exercise.name}
-              variantId={slot.selectedVariantId}
+              variantId={slot.variant?.id ?? null}
               plannedSet={plannedSet}
               logged={loggedFor(slot, plannedSet.setNumber)}
               optimistic={logging.optimistic[plannedSet.id]}
               draft={drafts[plannedSet.id]}
-              disabled={switching}
               onDraftChange={(patch) => setDraft(plannedSet.id, patch)}
               onLogStarted={(values) => logging.begin(plannedSet.id, values)}
               onLogSettled={(succeeded) => {
@@ -113,7 +103,7 @@ function SlotSection({
 }
 
 export function SessionBody({ session, logging }: SessionBodyProps) {
-  const { drafts, setDraft, clearDraft, clearWeightDrafts } = useSetDrafts(session.id);
+  const { drafts, setDraft, clearDraft } = useSetDrafts(session.id);
 
   return (
     <>
@@ -128,7 +118,6 @@ export function SessionBody({ session, logging }: SessionBodyProps) {
             drafts={drafts}
             setDraft={setDraft}
             clearDraft={clearDraft}
-            clearWeightDrafts={clearWeightDrafts}
             logging={logging}
           />
         ))

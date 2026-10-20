@@ -323,59 +323,54 @@ describe('WorkoutSessionScreen', () => {
     });
   });
 
-  describe('the variant picker', () => {
-    const variants = [
-      { id: 'v1', name: 'Barbell' },
-      { id: 'v2', name: 'Dumbbell' },
-    ];
-
-    function withVariants(session: SessionView): SessionView {
+  describe('the variant', () => {
+    function withVariant(session: SessionView): SessionView {
       return {
         ...session,
         slots: session.slots.map((slot) =>
-          slot.id === 's1' ? { ...slot, variants, selectedVariantId: 'v1' } : slot,
+          slot.id === 's1' ? { ...slot, variant: { id: 'v1', name: 'Barbell' } } : slot,
         ),
       };
     }
 
-    function pickerFor(exerciseName: string) {
-      return screen.queryByRole('combobox', {
-        name: fitnessStrings.session.variantLabel(exerciseName),
+    function optionsLink(exerciseName: string) {
+      return screen.queryByRole('link', {
+        name: fitnessStrings.session.slotOptionsLabel(exerciseName),
       });
     }
 
-    it('shows the picker for a slot with variants and not for one without', () => {
-      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
+    it('shows the selected variant, muted, next to the exercise name', () => {
+      render(<WorkoutSessionScreen session={withVariant(freshSession())} />);
 
-      expect(pickerFor(bench)).not.toBeNull();
-      expect(pickerFor('Curl')).toBeNull();
+      const variant = within(section(bench)).getByText('Barbell');
+      expect(variant.className).toMatch(/variant/);
+      expect(screen.getByRole('heading', { level: 2, name: bench })).toBeDefined();
     });
 
-    it('disables the picker once a set of the slot is logged', () => {
-      render(<WorkoutSessionScreen session={withFirstSetLogged(withVariants(freshSession()))} />);
+    it('links to the slot’s settings from a slot with a variant', () => {
+      const session = withVariant(freshSession());
+      render(<WorkoutSessionScreen session={session} />);
 
-      expect(pickerFor(bench)?.hasAttribute('disabled')).toBe(true);
+      expect(optionsLink(bench)?.getAttribute('href')).toBe(
+        `/fitness-tracker/active/sessions/${session.id}/slots/s1`,
+      );
     });
 
-    it('disables the picker while a set is being logged', () => {
-      fetchMock.mockReturnValue(new Promise<Response>(() => undefined));
-      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
+    it('shows no variant and no settings link on a slot without a variant', () => {
+      render(<WorkoutSessionScreen session={withVariant(freshSession())} />);
 
-      fireEvent.click(logButton(1));
-
-      expect(pickerFor(bench)?.hasAttribute('disabled')).toBe(true);
+      expect(within(section('Curl')).queryByText('Barbell')).toBeNull();
+      expect(optionsLink('Curl')).toBeNull();
     });
 
-    function requiredPicker(): HTMLElement {
-      const picker = pickerFor(bench);
-      if (!picker) {
-        throw new Error('The picker is missing');
-      }
-      return picker;
-    }
+    it('offers no variant picker on the session', () => {
+      render(<WorkoutSessionScreen session={withVariant(freshSession())} />);
+
+      expect(screen.queryByRole('combobox')).toBeNull();
+    });
 
     it('sends the variant the slot shows with a logged set', async () => {
-      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
+      render(<WorkoutSessionScreen session={withVariant(freshSession())} />);
 
       fireEvent.click(logButton(1));
 
@@ -385,33 +380,9 @@ describe('WorkoutSessionScreen', () => {
       );
     });
 
-    it('drops the typed weights and disables logging of the slot as soon as a switch starts', () => {
-      fetchMock.mockReturnValue(new Promise<Response>(() => undefined));
-      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
-      fireEvent.change(weightBox(1), { target: { value: '70' } });
-      fireEvent.change(repsBox(1), { target: { value: '8' } });
-
-      fireEvent.change(requiredPicker(), { target: { value: 'v2' } });
-
-      expect(weightBox(1).value).toBe('');
-      expect(repsBox(1).value).toBe('8');
-      expect(logButton(1).hasAttribute('disabled')).toBe(true);
-      expect(logButton(3).hasAttribute('disabled')).toBe(true);
-      expect(logButton(1, 'Curl').hasAttribute('disabled')).toBe(false);
-    });
-
-    it('lets the slot be logged again once a switch fails', async () => {
-      fetchMock.mockResolvedValue(Response.json({ error: 'variant-locked' }, { status: 409 }));
-      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
-
-      fireEvent.change(requiredPicker(), { target: { value: 'v2' } });
-
-      await waitFor(() => expect(logButton(1).hasAttribute('disabled')).toBe(false));
-    });
-
     it('shows the message and refreshes when the slot was switched elsewhere', async () => {
       fetchMock.mockResolvedValue(Response.json({ error: 'variant-changed' }, { status: 409 }));
-      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
+      render(<WorkoutSessionScreen session={withVariant(freshSession())} />);
 
       fireEvent.click(logButton(1));
 
@@ -419,17 +390,6 @@ describe('WorkoutSessionScreen', () => {
         expect(screen.getByRole('alert').textContent).toBe(fitnessErrorStrings['variant-changed']),
       );
       expect(router.refresh).toHaveBeenCalledTimes(1);
-    });
-
-    it('drops the typed weights, and keeps the reps, after switching variant', async () => {
-      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
-      fireEvent.change(weightBox(1), { target: { value: '70' } });
-      fireEvent.change(repsBox(1), { target: { value: '8' } });
-
-      fireEvent.change(requiredPicker(), { target: { value: 'v2' } });
-
-      await waitFor(() => expect(weightBox(1).value).toBe(''));
-      expect(repsBox(1).value).toBe('8');
     });
   });
 

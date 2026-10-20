@@ -15,7 +15,7 @@ type VariantPickerProps = {
   selectedVariantId: string | null;
   locked: boolean;
   onSwitchStart: () => void;
-  onSwitchSettled: (succeeded: boolean) => void;
+  onSwitched: () => void;
 };
 
 export function VariantPicker({
@@ -26,7 +26,7 @@ export function VariantPicker({
   selectedVariantId,
   locked,
   onSwitchStart,
-  onSwitchSettled,
+  onSwitched,
 }: VariantPickerProps) {
   const selectId = useId();
   const action = useFitnessAction();
@@ -39,8 +39,8 @@ export function VariantPicker({
       'PUT',
       `/api/fitness/sessions/${sessionId}/slots/${slotId}/variant`,
       { variantId },
+      onSwitched,
     );
-    onSwitchSettled(ok);
     if (!ok) {
       setChoice(selectedVariantId ?? '');
     }

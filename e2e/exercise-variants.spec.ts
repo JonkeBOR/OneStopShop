@@ -44,6 +44,10 @@ test('an exercise keeps separate last weights per variant, switchable until a se
   const variantPicker = page.getByRole('combobox', {
     name: fitnessStrings.session.variantLabel(exerciseName),
   });
+  const slotOptions = page.getByRole('link', {
+    name: fitnessStrings.session.slotOptionsLabel(exerciseName),
+  });
+  const card = page.getByRole('region', { name: exerciseName });
   await signIn(context);
 
   await page.goto('/fitness-tracker');
@@ -95,20 +99,32 @@ test('an exercise keeps separate last weights per variant, switchable until a se
   await expect(variantsRegion).toContainText('Gym B');
 
   await openBlockWorkout(page, programName, 2, workoutName);
-  await expect(variantPicker.locator('option:checked')).toHaveText('Gym A');
+  const sessionUrl = page.url();
+  await expect(card.getByText('Gym A', { exact: true })).toBeVisible();
   await expect(weight).toHaveAttribute('placeholder', '40');
+  await expect(variantPicker).toHaveCount(0);
+  await slotOptions.click();
+  await expect(page.getByRole('heading', { level: 1, name: exerciseName })).toBeVisible();
+  await expect(variantPicker.locator('option:checked')).toHaveText('Gym A');
   await variantPicker.selectOption({ label: 'Gym B' });
+  await expect(page).toHaveURL(sessionUrl);
+  await expect(card.getByText('Gym B', { exact: true })).toBeVisible();
   await expect(weight).toHaveAttribute('placeholder', '');
 
-  const sessionUrl = page.url();
   await page.goto('/fitness-tracker');
-  await page.goto(sessionUrl);
-  await expect(variantPicker.locator('option:checked')).toHaveText('Gym B');
+  await page.goto(sessionUrl, { waitUntil: 'networkidle' });
+  await expect(card.getByText('Gym B', { exact: true })).toBeVisible();
 
   await weight.fill('30');
   await logButton.click();
   await expect(page.getByText(fitnessStrings.session.loggedLabel(1))).toBeVisible();
+  await slotOptions.click();
   await expect(variantPicker).toBeDisabled();
+  await page.goto(sessionUrl, { waitUntil: 'networkidle' });
+  const loggedRow = card
+    .getByRole('row')
+    .filter({ hasText: fitnessStrings.session.loggedLabel(1) });
+  await expect(loggedRow.getByRole('cell').nth(1)).toHaveText('30');
   await page.getByRole('button', { name: fitnessStrings.session.finishWorkout }).click();
   await expect(page).toHaveURL(/\/finished/);
 
@@ -122,6 +138,6 @@ test('an exercise keeps separate last weights per variant, switchable until a se
   await expect(variantsRegion).toContainText('Gym A');
 
   await openBlockWorkout(page, programName, 1, workoutName);
-  await expect(variantPicker.locator('option:checked')).toHaveText('Gym A');
+  await expect(card.getByText('Gym A', { exact: true })).toBeVisible();
   await expect(weight).toHaveAttribute('placeholder', '40');
 });

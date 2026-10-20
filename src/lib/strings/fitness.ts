@@ -38,6 +38,7 @@ export const fitnessStrings = {
     toActiveProgram: 'Active program',
     toBlock: 'Current block',
     toExercises: 'Exercises',
+    toSession: 'Workout session',
   },
   notFound: {
     title: 'Not found',
@@ -212,6 +213,7 @@ export const fitnessStrings = {
     finishEmptyConfirm: 'Finish without logging any sets?',
     nothingToLog: 'There is nothing to log in this workout.',
     variantLabel: (exerciseName: string) => `Variant, ${exerciseName}`,
+    slotOptionsLabel: (exerciseName: string) => `Options, ${exerciseName}`,
   },
   finished: {
     affirmations: [

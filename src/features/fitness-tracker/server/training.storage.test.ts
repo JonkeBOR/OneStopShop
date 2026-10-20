@@ -7,7 +7,14 @@ import { getProgram } from './programs';
 import { cycles, plannedSets, plannedSetVariantWeights, setLogs } from './schema';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
 import { createProgramFromSpec, expectOk, type ProgramSpec } from './storage-test-support';
-import { finishWorkout, getSession, getTrainingOverview, logSet, startWorkout } from './training';
+import {
+  finishWorkout,
+  getSession,
+  getSessionSlotSettings,
+  getTrainingOverview,
+  logSet,
+  startWorkout,
+} from './training';
 import { addVariant, switchSlotVariant } from './variants';
 
 describe('training', () => {
@@ -398,7 +405,16 @@ describe('training', () => {
       const { db } = testDatabase;
       const program = await activeProgram({
         blockCount: 2,
-        workouts: [{ name: 'Lower A', slots: [{ exercise: 'Squat', targetReps: [5, 5] }] }],
+        workouts: [
+          {
+            name: 'Lower A',
+            slots: [
+              { exercise: 'Squat', targetReps: [5, 5] },
+              { exercise: 'Curl', targetReps: [10] },
+            ],
+          },
+          { name: 'Upper A', slots: [{ exercise: 'Bench', targetReps: [8] }] },
+        ],
       });
       const slot = program.workouts[0]?.slots[0];
       const exerciseId = slot?.exercise.id ?? '';
@@ -407,8 +423,81 @@ describe('training', () => {
       );
       const smith = expectOk(await addVariant(db, profileId, exerciseId, { name: 'Smith' }, later));
       const session = await open(program.workouts[0]?.id ?? '');
-      return { slotId: slot?.id ?? '', barbell, smith, session };
+      return {
+        slotId: slot?.id ?? '',
+        exercise: slot?.exercise,
+        plainSlotId: program.workouts[0]?.slots[1]?.id ?? '',
+        otherWorkoutSlotId: program.workouts[1]?.slots[0]?.id ?? '',
+        barbell,
+        smith,
+        session,
+      };
     }
+
+    it('getSession gives each slot its selected variant, and none to an exercise without variants', async () => {
+      const { db } = testDatabase;
+      const { slotId, plainSlotId, barbell, session } = await variantSession();
+
+      const view = expectOk(await getSession(db, profileId, session.id));
+
+      expect(view.slots.find((slot) => slot.id === slotId)?.variant).toEqual(barbell);
+      expect(view.slots.find((slot) => slot.id === plainSlotId)?.variant).toBeNull();
+    });
+
+    it('getSessionSlotSettings lists the active variants oldest first, the selection and the block’s planned sets', async () => {
+      const { db } = testDatabase;
+      const { slotId, exercise, barbell, smith, session } = await variantSession();
+
+      const settings = expectOk(await getSessionSlotSettings(db, profileId, session.id, slotId));
+
+      expect(settings).toEqual({
+        sessionId: session.id,
+        status: 'in_progress',
+        exercise,
+        plannedSetIds: session.slots[0]?.plannedSets.map((plannedSet) => plannedSet.id),
+        variants: [barbell, smith],
+        selectedVariantId: barbell.id,
+        isLocked: false,
+      });
+    });
+
+    it('getSessionSlotSettings is locked once a set of the slot is logged in the session', async () => {
+      const { db } = testDatabase;
+      const { slotId, session } = await variantSession();
+      expectOk(
+        await logSet(
+          db,
+          profileId,
+          session.id,
+          session.slots[0]?.plannedSets[0]?.id ?? '',
+          { reps: 5, weightKg: 40 },
+          now,
+        ),
+      );
+
+      const settings = expectOk(await getSessionSlotSettings(db, profileId, session.id, slotId));
+
+      expect(settings.isLocked).toBe(true);
+    });
+
+    it('getSessionSlotSettings answers not-found for another profile, another workout’s slot or an unknown slot', async () => {
+      const { db } = testDatabase;
+      const { slotId, otherWorkoutSlotId, session } = await variantSession();
+      const intruderId = (await ensureProfile(db, crypto.randomUUID(), now)).id;
+
+      expect(await getSessionSlotSettings(db, intruderId, session.id, slotId)).toEqual({
+        ok: false,
+        error: 'not-found',
+      });
+      expect(await getSessionSlotSettings(db, profileId, session.id, otherWorkoutSlotId)).toEqual({
+        ok: false,
+        error: 'not-found',
+      });
+      expect(await getSessionSlotSettings(db, profileId, session.id, crypto.randomUUID())).toEqual({
+        ok: false,
+        error: 'not-found',
+      });
+    });
 
     it('logSet records the slot’s selected variant on the set log', async () => {
       const { db } = testDatabase;

@@ -62,6 +62,16 @@ with `variant-changed`, writing nothing, so a weight is never recorded against t
 A log request without the key is accepted as before, which keeps a page opened before a deploy
 working.
 
+### The picker lives on the slot's edit page
+
+The session's exercise cards stay clean: each card shows the selected variant, muted, next to the
+exercise name, and an exercise with variants gets an options link to
+`/fitness-tracker/active/sessions/[sessionId]/slots/[slotId]`. That page, `SlotSectionEdit`, holds
+the picker and is where later quick settings for a slot will go. Choosing a variant clears the
+slot's typed weights and returns to the session. The session therefore loads only each slot's
+selected variant, and `getSessionSlotSettings` loads the exercise's full list of active variants
+on demand, when the edit page opens.
+
 ### `set_logs.variant_id` has no foreign key
 
 Each logged set records its variant, nullable for sets logged before variants existed or for an

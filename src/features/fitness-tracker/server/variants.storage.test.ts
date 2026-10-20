@@ -429,20 +429,6 @@ describe('exercise variants', () => {
       .orderBy(asc(plannedSets.trainingBlockId), asc(plannedSets.setNumber));
   }
 
-  it('the session lists the exercise’s active variants and the slot’s selected one', async () => {
-    const { db } = testDatabase;
-    const { slotId, barbell, smith, session } = await switchingSetup();
-
-    const view = expectOk(await getSession(db, profileId, session.id));
-
-    const squat = view.slots.find((entry) => entry.id === slotId);
-    expect(squat?.variants).toEqual([barbell, smith]);
-    expect(squat?.selectedVariantId).toBe(barbell.id);
-    const curl = view.slots.find((entry) => entry.id !== slotId);
-    expect(curl?.variants).toEqual([]);
-    expect(curl?.selectedVariantId).toBeNull();
-  });
-
   it('switching loads the target’s weights into every block of the slot and parks the current ones', async () => {
     const { db } = testDatabase;
     const { slotId, barbell, smith, session } = await switchingSetup();
