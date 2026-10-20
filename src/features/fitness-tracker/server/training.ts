@@ -12,7 +12,7 @@ import type {
   SetLog,
   TrainingOverview,
 } from '../domain/types';
-import { isUniqueConstraintViolation, runBatch, type Statement } from './batch';
+import { chunkIds, isUniqueConstraintViolation, runBatch, type Statement } from './batch';
 import { startPassStatements } from './cycle-statements';
 import { type BlockRow, type CycleRow, toExercise, toExerciseVariant, toSetLog } from './mapping';
 import {
@@ -203,13 +203,16 @@ export async function getSession(
   const selectedVariantIds = new Set(
     slotRows.flatMap((slot) => slot.plannedSets[0]?.variantId ?? []),
   );
-  const variantRows = await db
-    .select()
-    .from(exerciseVariants)
-    .where(inArray(exerciseVariants.id, [...selectedVariantIds]));
-  const variantsById = new Map<string | null, ExerciseVariant>(
-    variantRows.map((row) => [row.id, toExerciseVariant(row)]),
-  );
+  const variantsById = new Map<string | null, ExerciseVariant>();
+  for (const chunk of chunkIds([...selectedVariantIds])) {
+    const rows = await db
+      .select()
+      .from(exerciseVariants)
+      .where(inArray(exerciseVariants.id, chunk));
+    for (const row of rows) {
+      variantsById.set(row.id, toExerciseVariant(row));
+    }
+  }
   return succeed({
     id: session.id,
     status: session.status,

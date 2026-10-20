@@ -33,7 +33,7 @@ test('an exercise keeps separate last weights per variant, switchable until a se
   const run = Date.now().toString(36);
   const programName = `Program ${run}`;
   const workoutName = `Day ${run}`;
-  const exerciseName = `Row ${run}`;
+  const exerciseName = `Seated cable row with neutral grip ${run}`;
   const variants = fitnessStrings.exerciseEdit.variants;
   const weight = page.getByRole('textbox', {
     name: fitnessStrings.session.weightLabel(1, exerciseName),
@@ -101,10 +101,12 @@ test('an exercise keeps separate last weights per variant, switchable until a se
   await openBlockWorkout(page, programName, 2, workoutName);
   const sessionUrl = page.url();
   await expect(card.getByText('Gym A', { exact: true })).toBeVisible();
+  await expect(slotOptions).toBeInViewport();
   await expect(weight).toHaveAttribute('placeholder', '40');
   await expect(variantPicker).toHaveCount(0);
   await slotOptions.click();
   await expect(page.getByRole('heading', { level: 1, name: exerciseName })).toBeVisible();
+  await page.waitForLoadState('networkidle');
   await expect(variantPicker.locator('option:checked')).toHaveText('Gym A');
   await variantPicker.selectOption({ label: 'Gym B' });
   await expect(page).toHaveURL(sessionUrl);
@@ -119,6 +121,8 @@ test('an exercise keeps separate last weights per variant, switchable until a se
   await logButton.click();
   await expect(page.getByText(fitnessStrings.session.loggedLabel(1))).toBeVisible();
   await slotOptions.click();
+  await expect(page.getByRole('heading', { level: 1, name: exerciseName })).toBeVisible();
+  await page.waitForLoadState('networkidle');
   await expect(variantPicker).toBeDisabled();
   await page.goto(sessionUrl, { waitUntil: 'networkidle' });
   const loggedRow = card

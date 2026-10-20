@@ -39,13 +39,15 @@ function SlotSection({
       aria-labelledby={headingId}
     >
       <div className={styles.header}>
-        <h2 id={headingId} className={styles.exercise}>
-          {slot.exercise.name}
-        </h2>
-        {slot.variant ? <span className={styles.variant}>{slot.variant.name}</span> : null}
-        {slot.isOptional ? (
-          <span className={styles.tag}>{fitnessStrings.common.optional}</span>
-        ) : null}
+        <div className={styles.title}>
+          <h2 id={headingId} className={styles.exercise}>
+            {slot.exercise.name}
+          </h2>
+          {slot.variant ? <span className={styles.variant}>{slot.variant.name}</span> : null}
+          {slot.isOptional ? (
+            <span className={styles.tag}>{fitnessStrings.common.optional}</span>
+          ) : null}
+        </div>
         {slot.variant ? (
           <Link
             className={styles.options}

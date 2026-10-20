@@ -11,7 +11,7 @@ export default async function SlotSectionEditPage({ params }: SlotSectionEditPag
     `/fitness-tracker/active/sessions/${sessionId}/slots/${slotId}`,
   );
   const settings = await getSessionSlotSettings(db, profileId, sessionId, slotId);
-  if (!settings.ok) {
+  if (!settings.ok || settings.value.variants.length === 0) {
     notFound();
   }
   if (settings.value.status === 'finished') {
