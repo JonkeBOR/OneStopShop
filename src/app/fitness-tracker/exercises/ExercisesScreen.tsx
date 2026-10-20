@@ -1,4 +1,4 @@
-import { AddNameForm } from '@/features/fitness-tracker/components/AddNameForm';
+import { AddLink } from '@/features/fitness-tracker/components/AddLink';
 import { ExerciseList } from '@/features/fitness-tracker/components/ExerciseList';
 import { Screen } from '@/features/fitness-tracker/components/Screen';
 import type { Exercise } from '@/features/fitness-tracker/domain/types';
@@ -11,12 +11,10 @@ export function ExercisesScreen({ exercises }: ExercisesScreenProps) {
     <Screen
       title={fitnessStrings.exercises.title}
       back={{ href: '/fitness-tracker', label: fitnessStrings.navigation.toHome }}
+      action={
+        <AddLink href="/fitness-tracker/exercises/new" label={fitnessStrings.exercises.add} />
+      }
     >
-      <AddNameForm
-        label={fitnessStrings.exercises.nameLabel}
-        submitLabel={fitnessStrings.exercises.add}
-        url="/api/fitness/exercises"
-      />
       <ExerciseList exercises={exercises} />
     </Screen>
   );

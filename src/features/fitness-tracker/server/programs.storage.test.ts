@@ -17,6 +17,8 @@ import {
   moveWorkout,
   removeTrainingBlock,
   removeWorkout,
+  renameProgram,
+  renameWorkout,
   replaceSlotExercise,
   setPrescription,
   setSlotOptional,
@@ -218,6 +220,63 @@ describe('program structure', () => {
       ok: false,
       error: 'name-required',
     });
+  });
+
+  it('refuses a program name the profile already uses, ignoring case and surrounding spaces', async () => {
+    const { db } = testDatabase;
+    expectOk(await createProgram(db, profileId, { name: 'Upper Lower', blockCount: 1 }, now));
+    const otherProfileId = (await ensureProfile(db, crypto.randomUUID(), now)).id;
+
+    expect(
+      await createProgram(db, profileId, { name: ' upper LOWER ', blockCount: 1 }, now),
+    ).toEqual({ ok: false, error: 'name-taken' });
+    expectOk(await createProgram(db, otherProfileId, { name: 'Upper Lower', blockCount: 1 }, now));
+    expect((await listPrograms(db, profileId)).map((program) => program.name)).toEqual([
+      'Upper Lower',
+    ]);
+  });
+
+  it('refuses renaming a program to another program’s name, but keeps its own name in any case', async () => {
+    const { db } = testDatabase;
+    expectOk(await createProgram(db, profileId, { name: '5/3/1', blockCount: 1 }, now));
+    const other = expectOk(
+      await createProgram(db, profileId, { name: 'Full body', blockCount: 1 }, now),
+    );
+
+    expect(await renameProgram(db, profileId, other.id, { name: '5/3/1 ' })).toEqual({
+      ok: false,
+      error: 'name-taken',
+    });
+    expect(expectOk(await renameProgram(db, profileId, other.id, { name: 'FULL BODY' })).name).toBe(
+      'FULL BODY',
+    );
+  });
+
+  it('refuses a workout name the program already uses, on add and on rename, but not across programs', async () => {
+    const { db } = testDatabase;
+    const first = expectOk(
+      await createProgram(db, profileId, { name: 'First', blockCount: 1 }, now),
+    );
+    const second = expectOk(
+      await createProgram(db, profileId, { name: 'Second', blockCount: 1 }, now),
+    );
+    expectOk(await addWorkout(db, profileId, first.id, { name: 'Day A' }));
+    const dayB =
+      expectOk(await addWorkout(db, profileId, first.id, { name: 'Day B' })).workouts[1]?.id ?? '';
+
+    expect(await addWorkout(db, profileId, first.id, { name: 'day a ' })).toEqual({
+      ok: false,
+      error: 'name-taken',
+    });
+    expect(await renameWorkout(db, profileId, dayB, { name: 'DAY A' })).toEqual({
+      ok: false,
+      error: 'name-taken',
+    });
+    expectOk(await renameWorkout(db, profileId, dayB, { name: 'day b' }));
+    expectOk(await addWorkout(db, profileId, second.id, { name: 'Day A' }));
+    expect(
+      expectOk(await getProgram(db, profileId, first.id)).workouts.map((workout) => workout.name),
+    ).toEqual(['Day A', 'day b']);
   });
 
   it('refuses an archived exercise and a slot with no planned sets', async () => {

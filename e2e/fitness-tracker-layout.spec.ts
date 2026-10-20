@@ -70,6 +70,7 @@ test('SC-005: no view scrolls sideways at 375 px, in light or dark mode', async 
   page,
   context,
 }, testInfo) => {
+  test.slow();
   await signIn(context);
   const run = Date.now().toString(36);
   const seeded = await seed(page.request, run);

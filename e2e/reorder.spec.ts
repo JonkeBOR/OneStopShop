@@ -24,13 +24,13 @@ test('reorders workouts by long-press drag and by keyboard, and the order is kep
   await signIn(context);
 
   await page.goto('/fitness-tracker/programs', { waitUntil: 'networkidle' });
-  await page.getByLabel(fitnessStrings.programs.nameLabel, { exact: true }).fill(`Order ${run}`);
-  await page.getByLabel(fitnessStrings.programs.blocksLabel, { exact: true }).fill('1');
-  await page.getByRole('button', { name: fitnessStrings.programs.create }).click();
+  await page.getByRole('link', { name: fitnessStrings.programs.add }).click();
+  await page.getByLabel(fitnessStrings.programEdit.nameLabel, { exact: true }).fill(`Order ${run}`);
+  await page.getByRole('button', { name: fitnessStrings.common.submit }).click();
   for (const name of names) {
     await page.getByRole('link', { name: fitnessStrings.programEdit.addWorkout }).click();
     await page.getByLabel(fitnessStrings.workoutEdit.nameLabel, { exact: true }).fill(name);
-    await page.getByRole('button', { name: fitnessStrings.workoutEdit.create }).click();
+    await page.getByRole('button', { name: fitnessStrings.common.submit }).click();
     await expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
     await page.getByRole('link', { name: fitnessStrings.navigation.toProgram }).click();
     await expect(page.getByRole('link', { name })).toBeVisible();

@@ -174,7 +174,7 @@ describe('WorkoutEditScreen', () => {
         screen.getByRole('textbox', { name: fitnessStrings.workoutEdit.nameLabel }),
         { target: { value: 'Day 3' } },
       );
-      fireEvent.click(screen.getByRole('button', { name: fitnessStrings.workoutEdit.create }));
+      fireEvent.click(screen.getByRole('button', { name: fitnessStrings.common.submit }));
 
       await waitFor(() =>
         expect(router.replace).toHaveBeenCalledWith('/fitness-tracker/programs/p1/workouts/w9'),
@@ -192,7 +192,7 @@ describe('WorkoutEditScreen', () => {
         screen.getByRole('textbox', { name: fitnessStrings.workoutEdit.nameLabel }),
         { target: { value: 'Upper A' } },
       );
-      fireEvent.click(screen.getByRole('button', { name: fitnessStrings.workoutEdit.create }));
+      fireEvent.click(screen.getByRole('button', { name: fitnessStrings.common.submit }));
 
       await waitFor(() =>
         expect(screen.getByRole('alert').textContent).toBe(fitnessErrorStrings['name-taken']),

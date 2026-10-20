@@ -59,7 +59,9 @@ link is primary or secondary; taps on the exercise chart cycle off → primary �
 program screen shows a weekly volume estimate per body part for a chosen block — sets weighted 1 for
 primary and 0.5 for secondary, optional exercises left out, coloured by fixed 10/20 bands — as a
 read-only `AnatomyChart` with a legend. The chart takes highlights, an optional legend and
-an optional label, and knows nothing about volume. An exercise can have variants (one per gym or
+an optional label, and knows nothing about volume. Programs and exercises are created from a + link
+to a name-only `…/new` page that then opens the edit page, as workouts are; program names are unique
+per profile and workout names per program. An exercise can have variants (one per gym or
 machine): the slot's selected variant and its weight sit on the planned sets, the other variants'
 weights are parked in `planned_set_variant_weights`, and the variant is switched mid-session until a
 set is logged. See
@@ -131,8 +133,10 @@ Two rules deserve emphasis because they are unusual and are hard errors:
 - **Never put a bare string in JSX.** `react/jsx-no-literals` rejects `<h1>Workouts</h1>` and
   `<h1>{'Workouts'}</h1>`; text comes from a constants module. Props are exempt.
 
-"Never add comments" is not enforceable by any off-the-shelf ESLint rule, so it is the one
-guideline a review has to catch by reading.
+"Never add comments" is not enforceable by any off-the-shelf ESLint rule, and neither is the
+two-step creation flow in [04-react-and-nextjs.md](docs/04-react-and-nextjs.md) (a + link to a
+name-only `…/new` page, then the edit page). Those are the guidelines a review has to catch by
+reading.
 
 ## Working in this repo
 

@@ -64,6 +64,15 @@ export function parseName(text: string): Result<string, 'name-required' | 'name-
   return succeed(name);
 }
 
+export function nameKey(name: string): string {
+  return name.trim().toLocaleLowerCase();
+}
+
+export function isNameTaken(name: string, existingNames: readonly string[]): boolean {
+  const key = nameKey(name);
+  return existingNames.some((existing) => nameKey(existing) === key);
+}
+
 export function localDate(now: Date, timeZone: string): Result<string, 'invalid-time-zone'> {
   try {
     const formatter = new Intl.DateTimeFormat('en-CA', {

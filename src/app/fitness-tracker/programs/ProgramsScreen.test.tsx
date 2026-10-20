@@ -38,11 +38,20 @@ describe('ProgramsScreen', () => {
     ).toBeNull();
   });
 
-  it('FR-005: explains what to do when there are no programs, and still offers the form', () => {
+  it('FR-005: explains what to do when there are no programs, and still offers the + link', () => {
     render(<ProgramsScreen programs={[]} />);
 
     expect(screen.getByText(fitnessStrings.programs.empty)).toBeDefined();
-    expect(screen.getByRole('button', { name: fitnessStrings.programs.create })).toBeDefined();
+    expect(screen.getByRole('link', { name: fitnessStrings.programs.add })).toBeDefined();
+  });
+
+  it('adds a program from a + link to its own page, not from a form on the list', () => {
+    render(<ProgramsScreen programs={programs} />);
+
+    expect(
+      screen.getByRole('link', { name: fitnessStrings.programs.add }).getAttribute('href'),
+    ).toBe('/fitness-tracker/programs/new');
+    expect(screen.queryByRole('textbox')).toBeNull();
   });
 
   it('FR-003: links back to the fitness tracker', () => {

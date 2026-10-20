@@ -369,19 +369,20 @@ describe('ProgramEditScreen', () => {
       );
     });
 
-    it('FR-032: an active program shows the badge, Pause and a link to the active program', () => {
+    it('FR-032: an active program shows the badge and Pause, with no link away or future-only note', () => {
       renderScreen({ program: programFixture({ isActive: true }) });
 
       expect(screen.getByText(fitnessStrings.programEdit.active)).toBeDefined();
       expect(screen.getByRole('button', { name: fitnessStrings.programEdit.pause })).toBeDefined();
       expect(
-        screen
-          .getByRole('link', { name: fitnessStrings.programEdit.openActiveProgram })
-          .getAttribute('href'),
-      ).toBe('/fitness-tracker/active');
-      expect(
         screen.queryByRole('button', { name: fitnessStrings.programEdit.activate }),
       ).toBeNull();
+      expect(
+        screen
+          .queryAllByRole('link')
+          .filter((link) => link.getAttribute('href') === '/fitness-tracker/active'),
+      ).toEqual([]);
+      expect(screen.queryByText('Changes apply to future workouts.')).toBeNull();
     });
 
     it('FR-038: pausing asks first and then refreshes the page', async () => {
@@ -421,11 +422,5 @@ describe('ProgramEditScreen', () => {
         screen.queryByRole('button', { name: fitnessStrings.programEdit.deleteProgram }),
       ).toBeNull();
     });
-  });
-
-  it('FR-032: tells the user that edits apply to future workouts while the program is active', () => {
-    renderScreen({ program: programFixture({ isActive: true }) });
-
-    expect(screen.getByText(fitnessStrings.programEdit.futureOnlyNote)).toBeDefined();
   });
 });

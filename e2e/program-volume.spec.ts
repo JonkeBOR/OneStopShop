@@ -29,15 +29,15 @@ test('estimates the weekly sets each body part gets from the program', async ({
 
   await page.goto('/fitness-tracker');
   await page.getByRole('link', { name: fitnessStrings.home.programsLink }).click();
-  await page.getByLabel(fitnessStrings.programs.nameLabel, { exact: true }).fill(programName);
-  await page.getByLabel(fitnessStrings.programs.blocksLabel, { exact: true }).fill('1');
-  await page.getByRole('button', { name: fitnessStrings.programs.create }).click();
+  await page.getByRole('link', { name: fitnessStrings.programs.add }).click();
+  await page.getByLabel(fitnessStrings.programEdit.nameLabel, { exact: true }).fill(programName);
+  await page.getByRole('button', { name: fitnessStrings.common.submit }).click();
   await expect(page.getByRole('heading', { level: 1, name: programName })).toBeVisible();
   const programUrl = page.url();
 
   await page.getByRole('link', { name: fitnessStrings.programEdit.addWorkout }).click();
   await page.getByLabel(fitnessStrings.workoutEdit.nameLabel, { exact: true }).fill(workoutName);
-  await page.getByRole('button', { name: fitnessStrings.workoutEdit.create }).click();
+  await page.getByRole('button', { name: fitnessStrings.common.submit }).click();
   await expect(page.getByRole('heading', { level: 1, name: workoutName })).toBeVisible();
 
   await page.getByRole('link', { name: fitnessStrings.workoutEdit.addExercise }).click();
