@@ -54,9 +54,7 @@ function SlotSection({
             href={`/fitness-tracker/active/sessions/${session.id}/slots/${slot.id}`}
             aria-label={fitnessStrings.session.slotOptionsLabel(slot.exercise.name)}
           >
-            <span className={styles.optionsCircle}>
-              <Ellipsis className={styles.optionsIcon} aria-hidden="true" />
-            </span>
+            <Ellipsis className={styles.optionsIcon} aria-hidden="true" />
           </Link>
         ) : null}
       </div>

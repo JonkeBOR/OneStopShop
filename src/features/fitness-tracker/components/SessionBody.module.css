@@ -58,23 +58,13 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-.optionsCircle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid var(--color-accent);
-  border-radius: 50%;
-}
-
-.options:active .optionsCircle {
+.options:active {
   opacity: 0.7;
 }
 
 .optionsIcon {
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .tag {

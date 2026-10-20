@@ -217,6 +217,9 @@ export const fitnessStrings = {
     variantLockedHint:
       'A set is already logged with this variant, so it cannot be changed in this workout.',
   },
+  slotSectionEdit: {
+    variantHeading: 'Exercise variant',
+  },
   finished: {
     affirmations: [
       'Well done!',

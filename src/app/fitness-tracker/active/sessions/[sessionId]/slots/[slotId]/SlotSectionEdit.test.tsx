@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SessionSlotSettings } from '@/features/fitness-tracker/domain/types';
 import { fitnessErrorStrings, fitnessStrings } from '@/lib/strings/fitness';
@@ -62,6 +62,21 @@ describe('SlotSectionEdit', () => {
       screen.getByRole('link', { name: fitnessStrings.navigation.toSession }).getAttribute('href'),
     ).toBe(`/fitness-tracker/active/sessions/${settings.sessionId}`);
     expect(picker().value).toBe('v1');
+  });
+
+  it('puts the picker under an "Exercise variant" heading', () => {
+    render(<SlotSectionEdit slotId="s1" settings={settingsFixture()} />);
+
+    const section = screen.getByRole('region', {
+      name: fitnessStrings.slotSectionEdit.variantHeading,
+    });
+    expect(
+      within(section).getByRole('heading', {
+        level: 2,
+        name: fitnessStrings.slotSectionEdit.variantHeading,
+      }),
+    ).toBeDefined();
+    expect(within(section).getByRole('combobox')).toBe(picker());
   });
 
   it('disables the picker once a set of the slot is logged', () => {
