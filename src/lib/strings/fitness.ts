@@ -256,6 +256,8 @@ export const fitnessStrings = {
       firstConfirmLabel: 'Move weights',
       remove: (name: string) => `Remove ${name}`,
       removeConfirm: 'Last weights for this variant will be deleted.',
+      removeLastConfirm:
+        'This is the only variant. Removing it deletes the last weights recorded for this exercise.',
       removeConfirmLabel: 'Remove',
     },
   },

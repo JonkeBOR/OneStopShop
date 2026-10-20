@@ -54,6 +54,24 @@ describe('AddNameForm', () => {
     expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(JSON.stringify({ name: 'Gym A' }));
   });
 
+  it('cannot open the confirmation until a name is typed', () => {
+    render(
+      <AddNameForm
+        label="Name"
+        submitLabel="Add"
+        url="/api/things"
+        confirm={{ message: 'Sure?', confirmLabel: 'Do it' }}
+      />,
+    );
+    const trigger = screen.getByRole('button', { name: 'Add' });
+
+    expect(trigger.hasAttribute('disabled')).toBe(true);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: '   ' } });
+    expect(trigger.hasAttribute('disabled')).toBe(true);
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Gym A' } });
+    expect(trigger.hasAttribute('disabled')).toBe(false);
+  });
+
   it('posts nothing when Enter is pressed in the field before confirming', () => {
     renderForm({ message: 'Sure?', confirmLabel: 'Do it' });
 

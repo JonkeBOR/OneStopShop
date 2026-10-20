@@ -22,7 +22,7 @@ export function VariantEditor({ exerciseId, variants }: VariantEditorProps) {
               <span className={styles.name}>{variant.name}</span>
               <ConfirmActionButton
                 triggerLabel={copy.remove(variant.name)}
-                message={copy.removeConfirm}
+                message={variants.length === 1 ? copy.removeLastConfirm : copy.removeConfirm}
                 confirmLabel={copy.removeConfirmLabel}
                 method="DELETE"
                 url={`${url}/${variant.id}`}

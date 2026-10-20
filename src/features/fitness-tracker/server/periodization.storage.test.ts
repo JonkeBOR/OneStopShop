@@ -118,16 +118,17 @@ describe('periodization', () => {
     slotIndex: number,
     blockIndex: number,
     variantId: string,
-    gramsBySet: readonly number[],
+    gramsBySet: readonly (number | null)[],
   ): Promise<void> {
     const slot = program.workouts[0]?.slots[slotIndex];
     const sets = slot?.prescriptions[blockIndex]?.plannedSets ?? [];
     await testDatabase.db.insert(plannedSetVariantWeights).values(
-      sets.map((plannedSet, index) => ({
-        plannedSetId: plannedSet.id,
-        variantId,
-        lastWeightGrams: gramsBySet[index] ?? 0,
-      })),
+      sets.flatMap((plannedSet, index) => {
+        const grams = gramsBySet[index];
+        return grams === null
+          ? []
+          : [{ plannedSetId: plannedSet.id, variantId, lastWeightGrams: grams ?? 0 }];
+      }),
     );
   }
 
@@ -437,6 +438,59 @@ describe('periodization', () => {
       [carried, carried, added],
       [carried, carried, added],
       [carried, carried, added],
+    ]);
+  });
+
+  it('turning periodization off carries each of two parked variants’ own most recent weight per set into every block', async () => {
+    const { db } = testDatabase;
+    const program = await programWithSlot(3, true);
+    const [aId, bId, cId] = await addVariants(program.workouts[0]?.slots[0]?.exercise.id ?? '', [
+      'A',
+      'B',
+      'C',
+    ]);
+    expectOk(await activateProgram(db, profileId, program.id, tick()));
+    expectOk(await skipToBlock(db, profileId, { blockId: program.blocks[2]?.id ?? '' }, tick()));
+    await setWeight(program, 0, 1, 40000);
+    await park(program, 0, 0, bId ?? '', [30000, 31000]);
+    await park(program, 0, 1, bId ?? '', [35000, null]);
+    await park(program, 0, 0, cId ?? '', [null, 21000]);
+    await park(program, 0, 2, cId ?? '', [22500, null]);
+
+    expectOk(
+      await setSlotPeriodization(db, profileId, slotIdOf(program), {
+        isPeriodized: false,
+        targetReps: [10, 10],
+      }),
+    );
+
+    const byVariant = (left: { variantId: string }, right: { variantId: string }) =>
+      left.variantId.localeCompare(right.variantId);
+    const firstSet = {
+      variantId: aId,
+      lastWeightGrams: 40000,
+      parked: [
+        { variantId: bId ?? '', lastWeightGrams: 35000 },
+        { variantId: cId ?? '', lastWeightGrams: 22500 },
+      ].sort(byVariant),
+    };
+    const secondSet = {
+      variantId: aId,
+      lastWeightGrams: null,
+      parked: [
+        { variantId: bId ?? '', lastWeightGrams: 31000 },
+        { variantId: cId ?? '', lastWeightGrams: 21000 },
+      ].sort(byVariant),
+    };
+    const state = await variantStateByBlock(program, 0);
+    expect(
+      state.map((block) =>
+        block.map((set) => ({ ...set, parked: [...set.parked].sort(byVariant) })),
+      ),
+    ).toEqual([
+      [firstSet, secondSet],
+      [firstSet, secondSet],
+      [firstSet, secondSet],
     ]);
   });
 

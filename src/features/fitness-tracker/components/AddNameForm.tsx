@@ -52,7 +52,7 @@ export function AddNameForm({ label, submitLabel, url, confirm }: AddNameFormPro
             triggerClassName={styles.submit}
             message={confirm.message}
             confirmLabel={confirm.confirmLabel}
-            disabled={action.pending}
+            disabled={action.pending || name.trim() === ''}
             onConfirm={() => void post()}
           />
         ) : (

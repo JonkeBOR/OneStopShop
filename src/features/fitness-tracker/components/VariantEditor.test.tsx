@@ -53,6 +53,22 @@ describe('VariantEditor', () => {
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('DELETE');
   });
 
+  it('warns that removing a variant deletes its last weights', () => {
+    render(<VariantEditor exerciseId="e1" variants={variants} />);
+
+    expect(screen.getAllByText(copy.removeConfirm)).toHaveLength(2);
+    expect(screen.queryByText(copy.removeLastConfirm)).toBeNull();
+  });
+
+  it('warns more strongly before removing the only variant', () => {
+    render(<VariantEditor exerciseId="e1" variants={[{ id: 'v1', name: 'Gym A' }]} />);
+
+    fireEvent.click(screen.getByRole('button', { name: copy.remove('Gym A') }));
+
+    expect(screen.getByText(copy.removeLastConfirm).closest('dialog[open]')).not.toBeNull();
+    expect(screen.queryByText(copy.removeConfirm)).toBeNull();
+  });
+
   it('shows the empty text and asks before adding the first variant', async () => {
     render(<VariantEditor exerciseId="e1" variants={[]} />);
     expect(screen.getByText(copy.empty)).toBeTruthy();
