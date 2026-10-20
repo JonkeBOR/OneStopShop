@@ -317,7 +317,7 @@ export async function logSet(
   profileId: string,
   sessionId: string,
   plannedSetId: string,
-  input: { reps: number; weightKg?: number | null },
+  input: { reps: number; weightKg?: number | null; expectedVariantId?: string | null },
   now: Date,
 ): Promise<
   Result<
@@ -327,6 +327,7 @@ export async function logSet(
     | 'planned-set-not-in-session'
     | 'invalid-reps'
     | 'invalid-weight'
+    | 'variant-changed'
   >
 > {
   const [session] = await db
@@ -366,6 +367,9 @@ export async function logSet(
   });
   if (!decision.ok) {
     return fail(decision.error);
+  }
+  if (input.expectedVariantId !== undefined && input.expectedVariantId !== target.variantId) {
+    return fail('variant-changed');
   }
   const row = {
     id: crypto.randomUUID(),

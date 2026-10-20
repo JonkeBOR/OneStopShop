@@ -308,4 +308,5 @@ export const fitnessErrorStrings: Record<FitnessErrorCode, string> = {
   'set-already-logged': 'That set is already logged. The page has been refreshed.',
   'variant-locked':
     'A set is already logged for this exercise, so its variant cannot be changed in this workout.',
+  'variant-changed': 'This exercise was switched to another variant. The page has been refreshed.',
 };

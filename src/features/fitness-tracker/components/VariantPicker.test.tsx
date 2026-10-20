@@ -14,7 +14,8 @@ const variants = [
 
 describe('VariantPicker', () => {
   const fetchMock = vi.fn<typeof fetch>();
-  const onSwitched = vi.fn();
+  const onSwitchStart = vi.fn();
+  const onSwitchSettled = vi.fn();
 
   beforeEach(() => {
     vi.stubGlobal('fetch', fetchMock);
@@ -24,7 +25,8 @@ describe('VariantPicker', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     fetchMock.mockReset();
-    onSwitched.mockReset();
+    onSwitchStart.mockReset();
+    onSwitchSettled.mockReset();
     router.refresh.mockReset();
   });
 
@@ -37,7 +39,8 @@ describe('VariantPicker', () => {
         variants={variants}
         selectedVariantId={overrides.selectedVariantId ?? 'v1'}
         locked={overrides.locked ?? false}
-        onSwitched={onSwitched}
+        onSwitchStart={onSwitchStart}
+        onSwitchSettled={onSwitchSettled}
       />,
     );
   }
@@ -62,12 +65,22 @@ describe('VariantPicker', () => {
     expect(picker().value).toBe('v2');
   });
 
+  it('reports the switch as started before the server answers', () => {
+    fetchMock.mockReturnValue(new Promise<Response>(() => undefined));
+    renderPicker();
+
+    fireEvent.change(picker(), { target: { value: 'v2' } });
+
+    expect(onSwitchStart).toHaveBeenCalledTimes(1);
+    expect(onSwitchSettled).not.toHaveBeenCalled();
+  });
+
   it('sends the chosen variant, refreshes and reports the switch', async () => {
     renderPicker();
 
     fireEvent.change(picker(), { target: { value: 'v2' } });
 
-    await waitFor(() => expect(onSwitched).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(onSwitchSettled).toHaveBeenCalledWith(true));
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/fitness/sessions/session-1/slots/s1/variant');
     expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('PUT');
     expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(JSON.stringify({ variantId: 'v2' }));
@@ -91,6 +104,6 @@ describe('VariantPicker', () => {
       expect(screen.getByRole('alert').textContent).toBe(fitnessErrorStrings['variant-locked']),
     );
     expect(picker().value).toBe('v1');
-    expect(onSwitched).not.toHaveBeenCalled();
+    expect(onSwitchSettled).toHaveBeenCalledWith(false);
   });
 });

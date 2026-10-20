@@ -479,5 +479,96 @@ describe('training', () => {
         );
       expect(parked.map((row) => row.lastWeightGrams)).toEqual([40000]);
     });
+
+    it('logSet refuses a set meant for a variant the slot was switched away from, writing nothing', async () => {
+      const { db } = testDatabase;
+      const { slotId, barbell, smith, session } = await variantSession();
+      await db
+        .update(plannedSets)
+        .set({ lastWeightGrams: 40000 })
+        .where(eq(plannedSets.exerciseSlotId, slotId));
+      expectOk(await switchSlotVariant(db, profileId, session.id, slotId, { variantId: smith.id }));
+      const plannedBefore = await db
+        .select()
+        .from(plannedSets)
+        .where(eq(plannedSets.exerciseSlotId, slotId));
+      const parkedBefore = await db.select().from(plannedSetVariantWeights);
+
+      expect(
+        await logSet(
+          db,
+          profileId,
+          session.id,
+          session.slots[0]?.plannedSets[0]?.id ?? '',
+          { reps: 5, weightKg: 40, expectedVariantId: barbell.id },
+          now,
+        ),
+      ).toEqual({ ok: false, error: 'variant-changed' });
+
+      expect(await db.select().from(setLogs).where(eq(setLogs.profileId, profileId))).toEqual([]);
+      expect(
+        await db.select().from(plannedSets).where(eq(plannedSets.exerciseSlotId, slotId)),
+      ).toEqual(plannedBefore);
+      expect(await db.select().from(plannedSetVariantWeights)).toEqual(parkedBefore);
+    });
+
+    it('logSet logs a set meant for the variant the slot shows', async () => {
+      const { db } = testDatabase;
+      const { slotId, smith, session } = await variantSession();
+      expectOk(await switchSlotVariant(db, profileId, session.id, slotId, { variantId: smith.id }));
+      const target = session.slots[0]?.plannedSets[0]?.id ?? '';
+
+      const logged = expectOk(
+        await logSet(
+          db,
+          profileId,
+          session.id,
+          target,
+          { reps: 5, weightKg: 30, expectedVariantId: smith.id },
+          now,
+        ),
+      );
+
+      expect(logged.variantId).toBe(smith.id);
+      const [updated] = await db.select().from(plannedSets).where(eq(plannedSets.id, target));
+      expect(updated?.lastWeightGrams).toBe(30000);
+    });
+
+    it('logSet logs a set meant for no variant on a slot without variants', async () => {
+      const { db } = testDatabase;
+      const program = await activeProgram(fourWorkouts);
+      const session = await open(program.workouts[0]?.id ?? '');
+
+      const logged = expectOk(
+        await logSet(
+          db,
+          profileId,
+          session.id,
+          session.slots[0]?.plannedSets[0]?.id ?? '',
+          { reps: 10, weightKg: 50, expectedVariantId: null },
+          now,
+        ),
+      );
+
+      expect(logged.variantId).toBeNull();
+    });
+
+    it('logSet refuses a set meant for a variant on a slot without variants', async () => {
+      const { db } = testDatabase;
+      const program = await activeProgram(fourWorkouts);
+      const session = await open(program.workouts[0]?.id ?? '');
+
+      expect(
+        await logSet(
+          db,
+          profileId,
+          session.id,
+          session.slots[0]?.plannedSets[0]?.id ?? '',
+          { reps: 10, weightKg: 50, expectedVariantId: crypto.randomUUID() },
+          now,
+        ),
+      ).toEqual({ ok: false, error: 'variant-changed' });
+      expect(await db.select().from(setLogs).where(eq(setLogs.profileId, profileId))).toEqual([]);
+    });
   });
 });

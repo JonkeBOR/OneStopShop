@@ -14,10 +14,12 @@ import type { LoggedValues } from './useSetLogging';
 type SetRowProps = {
   sessionId: string;
   exerciseName: string;
+  variantId: string | null;
   plannedSet: SessionPlannedSet;
   logged: SetLog | null;
   optimistic: LoggedValues | undefined;
   draft: SetDraft | undefined;
+  disabled: boolean;
   onDraftChange: (patch: SetDraft) => void;
   onLogStarted: (values: LoggedValues) => void;
   onLogSettled: (succeeded: boolean) => void;
@@ -39,10 +41,12 @@ function parseReps(text: string): number | null {
 export function SetRow({
   sessionId,
   exerciseName,
+  variantId,
   plannedSet,
   logged,
   optimistic,
   draft,
+  disabled,
   onDraftChange,
   onLogStarted,
   onLogSettled,
@@ -94,6 +98,7 @@ export function SetRow({
       plannedSetId: plannedSet.id,
       reps,
       weightKg: weightKg.value,
+      variantId,
     });
     onLogSettled(succeeded);
   }
@@ -130,7 +135,7 @@ export function SetRow({
             type="button"
             className={styles.log}
             aria-label={fitnessStrings.session.logLabel(plannedSet.setNumber, exerciseName)}
-            disabled={action.pending}
+            disabled={disabled || action.pending}
             onClick={() => void log()}
           >
             <Check className={styles.checkIcon} aria-hidden="true" />

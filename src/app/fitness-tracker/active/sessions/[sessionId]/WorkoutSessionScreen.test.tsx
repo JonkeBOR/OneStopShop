@@ -216,7 +216,7 @@ describe('WorkoutSessionScreen', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/fitness/sessions/${session.id}/sets`);
       expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(
-        JSON.stringify({ plannedSetId: 'p1', reps: 12, weightKg: 65 }),
+        JSON.stringify({ plannedSetId: 'p1', reps: 12, weightKg: 65, variantId: null }),
       );
     });
 
@@ -228,7 +228,7 @@ describe('WorkoutSessionScreen', () => {
 
       await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
       expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(
-        JSON.stringify({ plannedSetId: 'p1', reps: 12, weightKg: 67.5 }),
+        JSON.stringify({ plannedSetId: 'p1', reps: 12, weightKg: 67.5, variantId: null }),
       );
     });
 
@@ -239,7 +239,7 @@ describe('WorkoutSessionScreen', () => {
 
       await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
       expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(
-        JSON.stringify({ plannedSetId: 'p3', reps: 10, weightKg: null }),
+        JSON.stringify({ plannedSetId: 'p3', reps: 10, weightKg: null, variantId: null }),
       );
     });
 
@@ -251,7 +251,7 @@ describe('WorkoutSessionScreen', () => {
 
       await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
       expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(
-        JSON.stringify({ plannedSetId: 'p2', reps: 9, weightKg: 62.5 }),
+        JSON.stringify({ plannedSetId: 'p2', reps: 9, weightKg: 62.5, variantId: null }),
       );
     });
 
@@ -366,16 +366,67 @@ describe('WorkoutSessionScreen', () => {
       expect(pickerFor(bench)?.hasAttribute('disabled')).toBe(true);
     });
 
+    function requiredPicker(): HTMLElement {
+      const picker = pickerFor(bench);
+      if (!picker) {
+        throw new Error('The picker is missing');
+      }
+      return picker;
+    }
+
+    it('sends the variant the slot shows with a logged set', async () => {
+      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
+
+      fireEvent.click(logButton(1));
+
+      await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
+      expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(
+        JSON.stringify({ plannedSetId: 'p1', reps: 12, weightKg: 65, variantId: 'v1' }),
+      );
+    });
+
+    it('drops the typed weights and disables logging of the slot as soon as a switch starts', () => {
+      fetchMock.mockReturnValue(new Promise<Response>(() => undefined));
+      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
+      fireEvent.change(weightBox(1), { target: { value: '70' } });
+      fireEvent.change(repsBox(1), { target: { value: '8' } });
+
+      fireEvent.change(requiredPicker(), { target: { value: 'v2' } });
+
+      expect(weightBox(1).value).toBe('');
+      expect(repsBox(1).value).toBe('8');
+      expect(logButton(1).hasAttribute('disabled')).toBe(true);
+      expect(logButton(3).hasAttribute('disabled')).toBe(true);
+      expect(logButton(1, 'Curl').hasAttribute('disabled')).toBe(false);
+    });
+
+    it('lets the slot be logged again once a switch fails', async () => {
+      fetchMock.mockResolvedValue(Response.json({ error: 'variant-locked' }, { status: 409 }));
+      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
+
+      fireEvent.change(requiredPicker(), { target: { value: 'v2' } });
+
+      await waitFor(() => expect(logButton(1).hasAttribute('disabled')).toBe(false));
+    });
+
+    it('shows the message and refreshes when the slot was switched elsewhere', async () => {
+      fetchMock.mockResolvedValue(Response.json({ error: 'variant-changed' }, { status: 409 }));
+      render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
+
+      fireEvent.click(logButton(1));
+
+      await waitFor(() =>
+        expect(screen.getByRole('alert').textContent).toBe(fitnessErrorStrings['variant-changed']),
+      );
+      expect(router.refresh).toHaveBeenCalledTimes(1);
+    });
+
     it('drops the typed weights, and keeps the reps, after switching variant', async () => {
       render(<WorkoutSessionScreen session={withVariants(freshSession())} />);
       fireEvent.change(weightBox(1), { target: { value: '70' } });
       fireEvent.change(repsBox(1), { target: { value: '8' } });
 
-      const picker = pickerFor(bench);
-      if (!picker) {
-        throw new Error('The picker is missing');
-      }
-      fireEvent.change(picker, { target: { value: 'v2' } });
+      fireEvent.change(requiredPicker(), { target: { value: 'v2' } });
 
       await waitFor(() => expect(weightBox(1).value).toBe(''));
       expect(repsBox(1).value).toBe('8');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { fitnessStrings } from '@/lib/strings/fitness';
 import type { SessionSlot, SessionView, SetLog } from '../domain/types';
 import { SetRow } from './SetRow';
@@ -34,6 +34,7 @@ function SlotSection({
   logging: SetLogging;
 }) {
   const headingId = useId();
+  const [switching, setSwitching] = useState(false);
   return (
     <section
       className={slot.isOptional ? styles.optionalSlot : styles.slot}
@@ -59,7 +60,11 @@ function SlotSection({
             slot.loggedSets.length > 0 ||
             slot.plannedSets.some((set) => logging.optimistic[set.id] !== undefined)
           }
-          onSwitched={() => clearWeightDrafts(slot.plannedSets.map((set) => set.id))}
+          onSwitchStart={() => {
+            setSwitching(true);
+            clearWeightDrafts(slot.plannedSets.map((set) => set.id));
+          }}
+          onSwitchSettled={() => setSwitching(false)}
         />
       ) : null}
       <table className={styles.sets} aria-labelledby={headingId}>
@@ -85,10 +90,12 @@ function SlotSection({
               key={plannedSet.id}
               sessionId={session.id}
               exerciseName={slot.exercise.name}
+              variantId={slot.selectedVariantId}
               plannedSet={plannedSet}
               logged={loggedFor(slot, plannedSet.setNumber)}
               optimistic={logging.optimistic[plannedSet.id]}
               draft={drafts[plannedSet.id]}
+              disabled={switching}
               onDraftChange={(patch) => setDraft(plannedSet.id, patch)}
               onLogStarted={(values) => logging.begin(plannedSet.id, values)}
               onLogSettled={(succeeded) => {

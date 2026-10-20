@@ -1,10 +1,12 @@
 import 'server-only';
 import { isPlannedSetLogged } from '../../domain/logging';
-import { fail } from '../../domain/result';
+import { fail, succeed } from '../../domain/result';
 import type { FitnessRequestContext } from '../fitness-route';
 import {
+  hasKey,
   readJson,
   readNullableNumber,
+  readNullableString,
   readNumber,
   readString,
   respond,
@@ -47,6 +49,9 @@ export async function handleLogSet({
   const plannedSetId = readString(body.value, 'plannedSetId');
   const reps = readNumber(body.value, 'reps');
   const weightKg = readNullableNumber(body.value, 'weightKg');
+  const variantId = hasKey(body.value, 'variantId')
+    ? readNullableString(body.value, 'variantId')
+    : succeed(undefined);
   if (!plannedSetId.ok) {
     return respond(plannedSetId);
   }
@@ -55,6 +60,9 @@ export async function handleLogSet({
   }
   if (!weightKg.ok) {
     return respond(weightKg);
+  }
+  if (!variantId.ok) {
+    return respond(variantId);
   }
   const sessionId = params.id ?? '';
   const session = await getSession(db, profileId, sessionId);
@@ -73,7 +81,7 @@ export async function handleLogSet({
       profileId,
       sessionId,
       plannedSetId.value,
-      { reps: reps.value, weightKg: weightKg.value },
+      { reps: reps.value, weightKg: weightKg.value, expectedVariantId: variantId.value },
       now,
     ),
   );

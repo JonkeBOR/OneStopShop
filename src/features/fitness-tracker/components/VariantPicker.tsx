@@ -14,7 +14,8 @@ type VariantPickerProps = {
   variants: readonly ExerciseVariant[];
   selectedVariantId: string | null;
   locked: boolean;
-  onSwitched: () => void;
+  onSwitchStart: () => void;
+  onSwitchSettled: (succeeded: boolean) => void;
 };
 
 export function VariantPicker({
@@ -24,7 +25,8 @@ export function VariantPicker({
   variants,
   selectedVariantId,
   locked,
-  onSwitched,
+  onSwitchStart,
+  onSwitchSettled,
 }: VariantPickerProps) {
   const selectId = useId();
   const action = useFitnessAction();
@@ -32,14 +34,14 @@ export function VariantPicker({
 
   async function choose(variantId: string) {
     setChoice(variantId);
+    onSwitchStart();
     const ok = await action.run(
       'PUT',
       `/api/fitness/sessions/${sessionId}/slots/${slotId}/variant`,
       { variantId },
     );
-    if (ok) {
-      onSwitched();
-    } else {
+    onSwitchSettled(ok);
+    if (!ok) {
       setChoice(selectedVariantId ?? '');
     }
   }

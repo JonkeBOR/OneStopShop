@@ -56,6 +56,12 @@ slot has no variant and no weights.
 A switch is made in an in-progress session, writes immediately and applies to every block of the
 slot. It is refused with `variant-locked` once any set of that slot is logged in the session.
 
+Because a set log is immutable, logging a set sends the variant the page shows for its slot, and a
+mismatch with the planned set's current variant (a switch in flight or in another tab) is refused
+with `variant-changed`, writing nothing, so a weight is never recorded against the wrong variant.
+A log request without the key is accepted as before, which keeps a page opened before a deploy
+working.
+
 ### `set_logs.variant_id` has no foreign key
 
 Each logged set records its variant, nullable for sets logged before variants existed or for an
