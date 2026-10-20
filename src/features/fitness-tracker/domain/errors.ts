@@ -29,6 +29,8 @@ export const fitnessErrorCodes = [
   'session-not-in-progress',
   'planned-set-not-in-session',
   'set-already-logged',
+  'variant-locked',
+  'variant-changed',
 ] as const;
 
 export type FitnessErrorCode = (typeof fitnessErrorCodes)[number];

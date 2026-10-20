@@ -72,3 +72,6 @@ client_secret_*.json
 
 # Cloudflare local secrets
 .dev.vars
+
+# Working notes from planning sessions
+docs/superpowers/

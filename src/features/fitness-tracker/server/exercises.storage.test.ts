@@ -13,6 +13,7 @@ import { exerciseSlots } from './schema';
 import { createProgramFromSpec, expectOk } from './storage-test-support';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
 import { logSet, startWorkout } from './training';
+import { addVariant, removeVariant } from './variants';
 
 describe('exercise catalog', () => {
   let testDatabase: TestDatabase;
@@ -232,7 +233,39 @@ describe('exercise usage', () => {
       slots: [],
       hasSetLogs: false,
       bodyParts: [],
+      variants: [],
     });
+  });
+
+  it('getExerciseUsage lists active variants oldest first', async () => {
+    const { db } = testDatabase;
+    const exercise = expectOk(await addExercise(db, profileId, { name: 'Squat' }, now));
+    const smith = expectOk(
+      await addVariant(
+        db,
+        profileId,
+        exercise.id,
+        { name: 'Smith' },
+        new Date(now.getTime() + 2000),
+      ),
+    );
+    const barbell = expectOk(
+      await addVariant(db, profileId, exercise.id, { name: 'Barbell' }, now),
+    );
+    const goblet = expectOk(
+      await addVariant(
+        db,
+        profileId,
+        exercise.id,
+        { name: 'Goblet' },
+        new Date(now.getTime() + 1000),
+      ),
+    );
+    expectOk(await removeVariant(db, profileId, exercise.id, goblet.id, now));
+
+    const usage = expectOk(await getExerciseUsage(db, profileId, exercise.id));
+
+    expect(usage.variants).toEqual([barbell, smith]);
   });
 
   it('answers not-found for an exercise of another profile or one that does not exist', async () => {

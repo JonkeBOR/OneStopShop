@@ -64,6 +64,13 @@
       "when": 1792439206081,
       "tag": "0008_body_part_roles",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792449299951,
+      "tag": "0009_exercise_variants",
+      "breakpoints": true
     }
   ]
 }

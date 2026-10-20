@@ -41,7 +41,7 @@ the fitness tracker at `/fitness-tracker` is the app's first feature. `wrangler.
 and the D1 binding. See
 [004-hosting-and-persistence.md](docs/architecture/004-hosting-and-persistence.md).
 
-The fitness tracker is built end to end. The domain is Drizzle ORM with a thirteen-table schema in
+The fitness tracker is built end to end. The domain is Drizzle ORM with a fifteen-table schema in
 `src/features/fitness-tracker/server/schema.ts`, migrations generated into `migrations/`, pure rules
 in `src/features/fitness-tracker/domain/`, and server-only operations in
 `src/features/fitness-tracker/server/` that take a `Database` from `src/lib/server/database.ts` as
@@ -59,10 +59,14 @@ link is primary or secondary; taps on the exercise chart cycle off → primary �
 program screen shows a weekly volume estimate per body part for a chosen block — sets weighted 1 for
 primary and 0.5 for secondary, optional exercises left out, coloured by fixed 10/20 bands — as a
 read-only `AnatomyChart` with a legend. The chart takes highlights, an optional legend and
-an optional label, and knows nothing about volume. See
+an optional label, and knows nothing about volume. An exercise can have variants (one per gym or
+machine): the slot's selected variant and its weight sit on the planned sets, the other variants'
+weights are parked in `planned_set_variant_weights`, and the variant is switched mid-session until a
+set is logged. See
 [006-domain-persistence.md](docs/architecture/006-domain-persistence.md),
-[007-cycle-as-container-and-bff.md](docs/architecture/007-cycle-as-container-and-bff.md) and
-[008-weekly-volume-estimate.md](docs/architecture/008-weekly-volume-estimate.md).
+[007-cycle-as-container-and-bff.md](docs/architecture/007-cycle-as-container-and-bff.md),
+[008-weekly-volume-estimate.md](docs/architecture/008-weekly-volume-estimate.md) and
+[009-exercise-variants.md](docs/architecture/009-exercise-variants.md).
 
 Deployment is continuous: `.github/workflows/deploy.yml` runs the gate, the remote D1 migrations
 and the OpenNext build and deploy on every push to `main`. Merging is deploying. There is no local

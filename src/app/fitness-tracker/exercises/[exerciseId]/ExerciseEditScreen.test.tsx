@@ -28,6 +28,7 @@ function usage(overrides: Partial<ExerciseUsage> = {}): ExerciseUsage {
     ],
     hasSetLogs: true,
     bodyParts: [{ bodyPart: 'chest', role: 'primary' }],
+    variants: [],
     ...overrides,
   };
 }
@@ -66,6 +67,20 @@ describe('ExerciseEditScreen', () => {
         .getByRole('link', { name: fitnessStrings.navigation.toExercises })
         .getAttribute('href'),
     ).toBe('/fitness-tracker/exercises');
+  });
+
+  it('has a Variants region listing the exercise variants', () => {
+    render(
+      <ExerciseEditScreen
+        bodyParts={bodyParts}
+        usage={usage({ variants: [{ id: 'v1', name: 'Gym A' }] })}
+      />,
+    );
+
+    const region = screen.getByRole('region', {
+      name: fitnessStrings.exerciseEdit.variants.heading,
+    });
+    expect(within(region).getByText('Gym A')).toBeDefined();
   });
 
   it('FR-036: renames the exercise and shows a taken name inline', async () => {

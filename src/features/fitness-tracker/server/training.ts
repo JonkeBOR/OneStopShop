@@ -1,17 +1,25 @@
 import 'server-only';
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Database } from '@/lib/server/database';
 import { decideLogSet, prefill } from '../domain/logging';
 import { blockStatuses, decideAfterFinish } from '../domain/progression';
 import { fail, type Result, succeed } from '../domain/result';
 import { decideStartWorkout, suggestedNextWorkout, workoutStatuses } from '../domain/session';
-import type { SessionView, SetLog, TrainingOverview } from '../domain/types';
-import { isUniqueConstraintViolation, runBatch, type Statement } from './batch';
+import type {
+  ExerciseVariant,
+  SessionSlotSettings,
+  SessionView,
+  SetLog,
+  TrainingOverview,
+} from '../domain/types';
+import { chunkIds, isUniqueConstraintViolation, runBatch, type Statement } from './batch';
 import { startPassStatements } from './cycle-statements';
-import { type BlockRow, type CycleRow, toExercise, toSetLog } from './mapping';
+import { type BlockRow, type CycleRow, toExercise, toExerciseVariant, toSetLog } from './mapping';
 import {
   cycles,
   exerciseSlots,
+  exerciseVariants,
+  exercises,
   plannedSets,
   profiles,
   programs,
@@ -20,6 +28,7 @@ import {
   workoutSessions,
   workouts,
 } from './schema';
+import { listActiveVariants } from './variants';
 
 type ActiveContext = {
   programId: string;
@@ -191,6 +200,19 @@ export async function getSession(
       .orderBy(asc(setLogs.performedAt), sql`rowid`),
   ]);
   const logs = logRows.map(toSetLog);
+  const selectedVariantIds = new Set(
+    slotRows.flatMap((slot) => slot.plannedSets[0]?.variantId ?? []),
+  );
+  const variantsById = new Map<string | null, ExerciseVariant>();
+  for (const chunk of chunkIds([...selectedVariantIds])) {
+    const rows = await db
+      .select()
+      .from(exerciseVariants)
+      .where(inArray(exerciseVariants.id, chunk));
+    for (const row of rows) {
+      variantsById.set(row.id, toExerciseVariant(row));
+    }
+  }
   return succeed({
     id: session.id,
     status: session.status,
@@ -208,7 +230,60 @@ export async function getSession(
       isOptional: slot.isOptional,
       plannedSets: prefill(slot.plannedSets),
       loggedSets: logs.filter((log) => log.context.exerciseSlotId === slot.id),
+      variant: variantsById.get(slot.plannedSets[0]?.variantId ?? null) ?? null,
     })),
+  });
+}
+
+export async function getSessionSlotSettings(
+  db: Database,
+  profileId: string,
+  sessionId: string,
+  slotId: string,
+): Promise<Result<SessionSlotSettings, 'not-found'>> {
+  const [session] = await db
+    .select()
+    .from(workoutSessions)
+    .where(and(eq(workoutSessions.id, sessionId), eq(workoutSessions.profileId, profileId)))
+    .limit(1);
+  if (!session) {
+    return fail('not-found');
+  }
+  const [slot] = await db
+    .select({ exercise: exercises })
+    .from(exerciseSlots)
+    .innerJoin(exercises, eq(exercises.id, exerciseSlots.exerciseId))
+    .where(and(eq(exerciseSlots.id, slotId), eq(exerciseSlots.workoutId, session.workoutId)))
+    .limit(1);
+  if (!slot) {
+    return fail('not-found');
+  }
+  const [slotPlannedSets, [logged], active] = await Promise.all([
+    db
+      .select({ id: plannedSets.id, variantId: plannedSets.variantId })
+      .from(plannedSets)
+      .where(
+        and(
+          eq(plannedSets.exerciseSlotId, slotId),
+          eq(plannedSets.trainingBlockId, session.trainingBlockId),
+        ),
+      )
+      .orderBy(asc(plannedSets.setNumber)),
+    db
+      .select({ id: setLogs.id })
+      .from(setLogs)
+      .where(and(eq(setLogs.workoutSessionId, session.id), eq(setLogs.exerciseSlotId, slotId)))
+      .limit(1),
+    listActiveVariants(db, [slot.exercise.id]),
+  ]);
+  return succeed({
+    sessionId: session.id,
+    status: session.status,
+    exercise: toExercise(slot.exercise),
+    plannedSetIds: slotPlannedSets.map((plannedSet) => plannedSet.id),
+    variants: active.get(slot.exercise.id) ?? [],
+    selectedVariantId: slotPlannedSets[0]?.variantId ?? null,
+    isLocked: logged !== undefined,
   });
 }
 
@@ -310,7 +385,7 @@ export async function logSet(
   profileId: string,
   sessionId: string,
   plannedSetId: string,
-  input: { reps: number; weightKg?: number | null },
+  input: { reps: number; weightKg?: number | null; expectedVariantId?: string | null },
   now: Date,
 ): Promise<
   Result<
@@ -320,6 +395,7 @@ export async function logSet(
     | 'planned-set-not-in-session'
     | 'invalid-reps'
     | 'invalid-weight'
+    | 'variant-changed'
   >
 > {
   const [session] = await db
@@ -330,6 +406,7 @@ export async function logSet(
   const [target] = await db
     .select({
       setNumber: plannedSets.setNumber,
+      variantId: plannedSets.variantId,
       slotId: exerciseSlots.id,
       slotWorkoutId: exerciseSlots.workoutId,
       exerciseId: exerciseSlots.exerciseId,
@@ -359,6 +436,9 @@ export async function logSet(
   if (!decision.ok) {
     return fail(decision.error);
   }
+  if (input.expectedVariantId !== undefined && input.expectedVariantId !== target.variantId) {
+    return fail('variant-changed');
+  }
   const row = {
     id: crypto.randomUUID(),
     profileId,
@@ -375,6 +455,7 @@ export async function logSet(
     workoutSessionId: session.id,
     pass: session.pass,
     blockNumber: target.blockNumber,
+    variantId: target.variantId,
   };
   await runBatch(db, [
     db.insert(setLogs).values(row),

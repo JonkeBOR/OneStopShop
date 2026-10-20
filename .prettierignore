@@ -13,3 +13,4 @@ blob-report/
 .wrangler/
 migrations/meta/
 .superpowers/
+*.md

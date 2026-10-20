@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ActionButton } from '@/features/fitness-tracker/components/ActionButton';
 import { BodyPartEditor } from '@/features/fitness-tracker/components/BodyPartEditor';
 import { DeleteExerciseButton } from '@/features/fitness-tracker/components/DeleteExerciseButton';
+import { VariantEditor } from '@/features/fitness-tracker/components/VariantEditor';
 import { RenameForm } from '@/features/fitness-tracker/components/RenameForm';
 import { Screen } from '@/features/fitness-tracker/components/Screen';
 import type { BodyPartView, ExerciseUsage } from '@/features/fitness-tracker/domain/types';
@@ -12,6 +13,7 @@ type ExerciseEditScreenProps = { usage: ExerciseUsage; bodyParts: readonly BodyP
 
 const usedInHeadingId = 'exercise-used-in-heading';
 const musclesHeadingId = 'exercise-muscles-heading';
+const variantsHeadingId = 'exercise-variants-heading';
 
 export function ExerciseEditScreen({ usage, bodyParts }: ExerciseEditScreenProps) {
   const { exercise, slots, hasSetLogs } = usage;
@@ -33,6 +35,12 @@ export function ExerciseEditScreen({ usage, bodyParts }: ExerciseEditScreenProps
           {fitnessStrings.exerciseEdit.musclesHeading}
         </h2>
         <BodyPartEditor exerciseId={exercise.id} bodyParts={bodyParts} links={usage.bodyParts} />
+      </section>
+      <section className={styles.section} aria-labelledby={variantsHeadingId}>
+        <h2 id={variantsHeadingId} className={styles.heading}>
+          {fitnessStrings.exerciseEdit.variants.heading}
+        </h2>
+        <VariantEditor exerciseId={exercise.id} variants={usage.variants} />
       </section>
       <section className={styles.section}>
         <h2 id={usedInHeadingId} className={styles.heading}>

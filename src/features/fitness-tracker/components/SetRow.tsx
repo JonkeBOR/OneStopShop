@@ -14,6 +14,7 @@ import type { LoggedValues } from './useSetLogging';
 type SetRowProps = {
   sessionId: string;
   exerciseName: string;
+  variantId: string | null;
   plannedSet: SessionPlannedSet;
   logged: SetLog | null;
   optimistic: LoggedValues | undefined;
@@ -39,6 +40,7 @@ function parseReps(text: string): number | null {
 export function SetRow({
   sessionId,
   exerciseName,
+  variantId,
   plannedSet,
   logged,
   optimistic,
@@ -94,6 +96,7 @@ export function SetRow({
       plannedSetId: plannedSet.id,
       reps,
       weightKg: weightKg.value,
+      variantId,
     });
     onLogSettled(succeeded);
   }

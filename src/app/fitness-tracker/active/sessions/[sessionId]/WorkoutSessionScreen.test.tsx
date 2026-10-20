@@ -24,6 +24,7 @@ function loggedSet(overrides: Partial<SetLog> = {}): SetLog {
     setNumber: 1,
     reps: 12,
     weightKg: 65,
+    variantId: null,
     context: {
       programId: 'pr',
       cycleId: 'c1',
@@ -215,7 +216,7 @@ describe('WorkoutSessionScreen', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       expect(fetchMock.mock.calls[0]?.[0]).toBe(`/api/fitness/sessions/${session.id}/sets`);
       expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(
-        JSON.stringify({ plannedSetId: 'p1', reps: 12, weightKg: 65 }),
+        JSON.stringify({ plannedSetId: 'p1', reps: 12, weightKg: 65, variantId: null }),
       );
     });
 
@@ -227,7 +228,7 @@ describe('WorkoutSessionScreen', () => {
 
       await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
       expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(
-        JSON.stringify({ plannedSetId: 'p1', reps: 12, weightKg: 67.5 }),
+        JSON.stringify({ plannedSetId: 'p1', reps: 12, weightKg: 67.5, variantId: null }),
       );
     });
 
@@ -238,7 +239,7 @@ describe('WorkoutSessionScreen', () => {
 
       await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
       expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(
-        JSON.stringify({ plannedSetId: 'p3', reps: 10, weightKg: null }),
+        JSON.stringify({ plannedSetId: 'p3', reps: 10, weightKg: null, variantId: null }),
       );
     });
 
@@ -250,7 +251,7 @@ describe('WorkoutSessionScreen', () => {
 
       await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
       expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(
-        JSON.stringify({ plannedSetId: 'p2', reps: 9, weightKg: 62.5 }),
+        JSON.stringify({ plannedSetId: 'p2', reps: 9, weightKg: 62.5, variantId: null }),
       );
     });
 
@@ -319,6 +320,76 @@ describe('WorkoutSessionScreen', () => {
       );
       expect(weightBox(1).value).toBe('70');
       expect(logButton(1)).toBeDefined();
+    });
+  });
+
+  describe('the variant', () => {
+    function withVariant(session: SessionView): SessionView {
+      return {
+        ...session,
+        slots: session.slots.map((slot) =>
+          slot.id === 's1' ? { ...slot, variant: { id: 'v1', name: 'Barbell' } } : slot,
+        ),
+      };
+    }
+
+    function optionsLink(exerciseName: string) {
+      return screen.queryByRole('link', {
+        name: fitnessStrings.session.slotOptionsLabel(exerciseName),
+      });
+    }
+
+    it('shows the selected variant, muted, next to the exercise name', () => {
+      render(<WorkoutSessionScreen session={withVariant(freshSession())} />);
+
+      const variant = within(section(bench)).getByText('Barbell');
+      expect(variant.className).toMatch(/variant/);
+      expect(screen.getByRole('heading', { level: 2, name: bench })).toBeDefined();
+    });
+
+    it('links to the slot’s settings from a slot with a variant', () => {
+      const session = withVariant(freshSession());
+      render(<WorkoutSessionScreen session={session} />);
+
+      expect(optionsLink(bench)?.getAttribute('href')).toBe(
+        `/fitness-tracker/active/sessions/${session.id}/slots/s1`,
+      );
+    });
+
+    it('shows no variant and no settings link on a slot without a variant', () => {
+      render(<WorkoutSessionScreen session={withVariant(freshSession())} />);
+
+      expect(within(section('Curl')).queryByText('Barbell')).toBeNull();
+      expect(optionsLink('Curl')).toBeNull();
+    });
+
+    it('offers no variant picker on the session', () => {
+      render(<WorkoutSessionScreen session={withVariant(freshSession())} />);
+
+      expect(screen.queryByRole('combobox')).toBeNull();
+    });
+
+    it('sends the variant the slot shows with a logged set', async () => {
+      render(<WorkoutSessionScreen session={withVariant(freshSession())} />);
+
+      fireEvent.click(logButton(1));
+
+      await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
+      expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(
+        JSON.stringify({ plannedSetId: 'p1', reps: 12, weightKg: 65, variantId: 'v1' }),
+      );
+    });
+
+    it('shows the message and refreshes when the slot was switched elsewhere', async () => {
+      fetchMock.mockResolvedValue(Response.json({ error: 'variant-changed' }, { status: 409 }));
+      render(<WorkoutSessionScreen session={withVariant(freshSession())} />);
+
+      fireEvent.click(logButton(1));
+
+      await waitFor(() =>
+        expect(screen.getByRole('alert').textContent).toBe(fitnessErrorStrings['variant-changed']),
+      );
+      expect(router.refresh).toHaveBeenCalledTimes(1);
     });
   });
 

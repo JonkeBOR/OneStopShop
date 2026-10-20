@@ -1,5 +1,7 @@
 'use client';
 
+import { Ellipsis } from 'lucide-react';
+import Link from 'next/link';
 import { useId } from 'react';
 import { fitnessStrings } from '@/lib/strings/fitness';
 import type { SessionSlot, SessionView, SetLog } from '../domain/types';
@@ -37,11 +39,23 @@ function SlotSection({
       aria-labelledby={headingId}
     >
       <div className={styles.header}>
-        <h2 id={headingId} className={styles.exercise}>
-          {slot.exercise.name}
-        </h2>
-        {slot.isOptional ? (
-          <span className={styles.tag}>{fitnessStrings.common.optional}</span>
+        <div className={styles.title}>
+          <h2 id={headingId} className={styles.exercise}>
+            {slot.exercise.name}
+          </h2>
+          {slot.variant ? <span className={styles.variant}>{slot.variant.name}</span> : null}
+          {slot.isOptional ? (
+            <span className={styles.tag}>{fitnessStrings.common.optional}</span>
+          ) : null}
+        </div>
+        {slot.variant ? (
+          <Link
+            className={styles.options}
+            href={`/fitness-tracker/active/sessions/${session.id}/slots/${slot.id}`}
+            aria-label={fitnessStrings.session.slotOptionsLabel(slot.exercise.name)}
+          >
+            <Ellipsis className={styles.optionsIcon} aria-hidden="true" />
+          </Link>
         ) : null}
       </div>
       <table className={styles.sets} aria-labelledby={headingId}>
@@ -67,6 +81,7 @@ function SlotSection({
               key={plannedSet.id}
               sessionId={session.id}
               exerciseName={slot.exercise.name}
+              variantId={slot.variant?.id ?? null}
               plannedSet={plannedSet}
               logged={loggedFor(slot, plannedSet.setNumber)}
               optimistic={logging.optimistic[plannedSet.id]}

@@ -117,9 +117,26 @@ export function useSetDrafts(sessionId: string) {
     [key],
   );
 
+  const clearWeightDrafts = useCallback(
+    (plannedSetIds: readonly string[]) => {
+      const remaining: SetDrafts = {};
+      for (const [id, draft] of Object.entries(parseDrafts(snapshotOf(key)))) {
+        if (!plannedSetIds.includes(id)) {
+          remaining[id] = draft;
+          continue;
+        }
+        if (draft.reps !== undefined) {
+          remaining[id] = { reps: draft.reps };
+        }
+      }
+      publish(key, serialize(remaining));
+    },
+    [key],
+  );
+
   const clearAll = useCallback(() => {
     publish(key, '');
   }, [key]);
 
-  return { drafts, setDraft, clearDraft, clearAll };
+  return { drafts, setDraft, clearDraft, clearWeightDrafts, clearAll };
 }

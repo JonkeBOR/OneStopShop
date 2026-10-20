@@ -38,6 +38,7 @@ export const fitnessStrings = {
     toActiveProgram: 'Active program',
     toBlock: 'Current block',
     toExercises: 'Exercises',
+    toSession: 'Workout session',
   },
   notFound: {
     title: 'Not found',
@@ -211,6 +212,13 @@ export const fitnessStrings = {
     finishEmptyConfirmLabel: 'Finish',
     finishEmptyConfirm: 'Finish without logging any sets?',
     nothingToLog: 'There is nothing to log in this workout.',
+    variantLabel: (exerciseName: string) => `Variant, ${exerciseName}`,
+    slotOptionsLabel: (exerciseName: string) => `Options, ${exerciseName}`,
+    variantLockedHint:
+      'A set is already logged with this variant, so it cannot be changed in this workout.',
+  },
+  slotSectionEdit: {
+    variantHeading: 'Exercise variant',
   },
   finished: {
     affirmations: [
@@ -245,6 +253,20 @@ export const fitnessStrings = {
     deleteConfirmLabel: 'Delete',
     deleteConfirm: 'Delete this exercise?',
     musclesHeading: 'Muscles worked',
+    variants: {
+      heading: 'Variants',
+      empty: 'No variants. Add one for each gym or machine whose weights differ.',
+      nameLabel: 'New variant name',
+      add: 'Add variant',
+      firstConfirm:
+        'The last weights already recorded for this exercise will move to this variant.',
+      firstConfirmLabel: 'Move weights',
+      remove: (name: string) => `Remove ${name}`,
+      removeConfirm: 'Last weights for this variant will be deleted.',
+      removeLastConfirm:
+        'This is the only variant. Removing it deletes the last weights recorded for this exercise.',
+      removeConfirmLabel: 'Remove',
+    },
   },
   anatomy: {
     chartLabel: 'Anatomy chart',
@@ -293,4 +315,7 @@ export const fitnessErrorStrings: Record<FitnessErrorCode, string> = {
   'session-not-in-progress': 'That workout is already finished. The page has been refreshed.',
   'planned-set-not-in-session': 'That set is not part of this workout.',
   'set-already-logged': 'That set is already logged. The page has been refreshed.',
+  'variant-locked':
+    'A set is already logged for this exercise, so its variant cannot be changed in this workout.',
+  'variant-changed': 'This exercise was switched to another variant. The page has been refreshed.',
 };

@@ -17,16 +17,58 @@
 
 .header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--space-2);
 }
 
+.title {
+  display: flex;
+  flex: 1;
+  align-self: center;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
 .exercise {
+  min-width: 0;
   margin: 0;
   font-size: var(--font-size-lg);
+  overflow-wrap: anywhere;
+}
+
+.variant {
+  flex-shrink: 0;
+  max-width: 45%;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.options {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-target-min);
+  min-height: var(--tap-target-min);
+  color: var(--color-accent);
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.options:active {
+  opacity: 0.7;
+}
+
+.optionsIcon {
+  width: 1.5rem;
+  height: 1.5rem;
 }
 
 .tag {
+  flex-shrink: 0;
   padding: 0 var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);

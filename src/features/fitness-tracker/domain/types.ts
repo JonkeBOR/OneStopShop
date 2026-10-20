@@ -5,6 +5,8 @@ export type Profile = { id: string };
 
 export type Exercise = { id: string; name: string; isArchived: boolean };
 
+export type ExerciseVariant = { id: string; name: string };
+
 export type BodyPartView = { id: BodyPart; name: string };
 
 export type SessionStatus = 'in_progress' | 'finished';
@@ -67,6 +69,7 @@ export type SetLog = {
   setNumber: number;
   reps: number;
   weightKg: number | null;
+  variantId: string | null;
   context: SetLogContext;
 };
 
@@ -85,6 +88,17 @@ export type SessionSlot = {
   isOptional: boolean;
   plannedSets: SessionPlannedSet[];
   loggedSets: SetLog[];
+  variant: ExerciseVariant | null;
+};
+
+export type SessionSlotSettings = {
+  sessionId: string;
+  status: SessionStatus;
+  exercise: Exercise;
+  plannedSetIds: string[];
+  variants: ExerciseVariant[];
+  selectedVariantId: string | null;
+  isLocked: boolean;
 };
 
 export type SessionView = {
@@ -127,4 +141,5 @@ export type ExerciseUsage = {
   slots: { programId: string; programName: string; workoutId: string; workoutName: string }[];
   hasSetLogs: boolean;
   bodyParts: BodyPartLink[];
+  variants: ExerciseVariant[];
 };

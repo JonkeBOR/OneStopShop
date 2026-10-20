@@ -3,6 +3,7 @@ import {
   toBodyweightEntry,
   toCycle,
   toExercise,
+  toExerciseVariant,
   toProgram,
   toSetLog,
   type ProgramRows,
@@ -26,6 +27,7 @@ const setLogRow = {
   workoutSessionId: 'ws1',
   pass: 1,
   blockNumber: 2,
+  variantId: 'v1' as string | null,
 };
 
 describe('toExercise', () => {
@@ -37,6 +39,21 @@ describe('toExercise', () => {
       isArchived: false,
     });
     expect(toExercise({ ...base, archivedAt: at }).isArchived).toBe(true);
+  });
+});
+
+describe('toExerciseVariant', () => {
+  it('maps the variant row to its id and name', () => {
+    expect(
+      toExerciseVariant({
+        id: 'v1',
+        exerciseId: 'e1',
+        name: 'Barbell',
+        nameKey: 'barbell',
+        createdAt: at,
+        removedAt: null,
+      }),
+    ).toEqual({ id: 'v1', name: 'Barbell' });
   });
 });
 
@@ -68,6 +85,11 @@ describe('toSetLog', () => {
 
   it('keeps a missing weight as null', () => {
     expect(toSetLog({ ...setLogRow, weightGrams: null }).weightKg).toBeNull();
+  });
+
+  it('carries the variant the set was logged with', () => {
+    expect(toSetLog(setLogRow).variantId).toBe('v1');
+    expect(toSetLog({ ...setLogRow, variantId: null }).variantId).toBeNull();
   });
 });
 
@@ -136,6 +158,7 @@ describe('toProgram', () => {
                 setNumber: 2,
                 targetReps: 12,
                 lastWeightGrams: 60000,
+                variantId: null,
               },
               {
                 id: 'ps1',
@@ -144,6 +167,7 @@ describe('toProgram', () => {
                 setNumber: 1,
                 targetReps: 12,
                 lastWeightGrams: 62500,
+                variantId: null,
               },
               {
                 id: 'ps2',
@@ -152,6 +176,7 @@ describe('toProgram', () => {
                 setNumber: 1,
                 targetReps: 10,
                 lastWeightGrams: null,
+                variantId: null,
               },
             ],
           },

@@ -36,6 +36,21 @@ export const exercises = sqliteTable(
   (table) => [uniqueIndex('exercises_profile_name_key').on(table.profileId, table.nameKey)],
 );
 
+export const exerciseVariants = sqliteTable(
+  'exercise_variants',
+  {
+    id: text('id').primaryKey(),
+    exerciseId: text('exercise_id')
+      .notNull()
+      .references(() => exercises.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    nameKey: text('name_key').notNull(),
+    createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+    removedAt: integer('removed_at', { mode: 'timestamp_ms' }),
+  },
+  (table) => [index('exercise_variants_exercise').on(table.exerciseId)],
+);
+
 export const bodyParts = sqliteTable('body_parts', {
   id: text('id', { enum: bodyPartIds }).primaryKey(),
   name: text('name').notNull(),
@@ -120,6 +135,9 @@ export const plannedSets = sqliteTable(
     setNumber: integer('set_number').notNull(),
     targetReps: integer('target_reps').notNull(),
     lastWeightGrams: integer('last_weight_grams'),
+    variantId: text('variant_id').references((): AnySQLiteColumn => exerciseVariants.id, {
+      onDelete: 'restrict',
+    }),
   },
   (table) => [
     uniqueIndex('planned_sets_slot_block_set').on(
@@ -128,6 +146,20 @@ export const plannedSets = sqliteTable(
       table.setNumber,
     ),
   ],
+);
+
+export const plannedSetVariantWeights = sqliteTable(
+  'planned_set_variant_weights',
+  {
+    plannedSetId: text('planned_set_id')
+      .notNull()
+      .references(() => plannedSets.id, { onDelete: 'cascade' }),
+    variantId: text('variant_id')
+      .notNull()
+      .references(() => exerciseVariants.id, { onDelete: 'cascade' }),
+    lastWeightGrams: integer('last_weight_grams').notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.plannedSetId, table.variantId] })],
 );
 
 export const cycles = sqliteTable(
@@ -191,6 +223,7 @@ export const setLogs = sqliteTable(
     workoutSessionId: text('workout_session_id').notNull(),
     pass: integer('cycle_number').notNull(),
     blockNumber: integer('block_number').notNull(),
+    variantId: text('variant_id'),
   },
   (table) => [
     index('set_logs_profile_exercise_performed').on(

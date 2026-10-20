@@ -3,6 +3,7 @@ import type {
   BodyweightEntry,
   Cycle,
   Exercise,
+  ExerciseVariant,
   PlannedSetView,
   Program,
   SetLog,
@@ -13,6 +14,7 @@ import type {
   cycles,
   exerciseSlots,
   exercises,
+  exerciseVariants,
   plannedSets,
   programs,
   setLogs,
@@ -21,6 +23,7 @@ import type {
 } from './schema';
 
 export type ExerciseRow = typeof exercises.$inferSelect;
+export type ExerciseVariantRow = typeof exerciseVariants.$inferSelect;
 export type CycleRow = typeof cycles.$inferSelect;
 export type SetLogRow = typeof setLogs.$inferSelect;
 export type BodyweightEntryRow = typeof bodyweightEntries.$inferSelect;
@@ -52,6 +55,10 @@ export function toExercise(row: ExerciseRow): Exercise {
   return { id: row.id, name: row.name, isArchived: row.archivedAt !== null };
 }
 
+export function toExerciseVariant(row: ExerciseVariantRow): ExerciseVariant {
+  return { id: row.id, name: row.name };
+}
+
 export function toCycle(row: CycleRow): Cycle {
   return { id: row.id, currentBlockId: row.currentBlockId, pass: row.pass };
 }
@@ -64,6 +71,7 @@ export function toSetLog(row: SetLogRow): SetLog {
     setNumber: row.setNumber,
     reps: row.reps,
     weightKg: nullableGramsToKg(row.weightGrams),
+    variantId: row.variantId,
     context: {
       programId: row.programId,
       cycleId: row.cycleId,

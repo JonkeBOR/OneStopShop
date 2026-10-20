@@ -93,6 +93,22 @@ describe('useSetDrafts', () => {
     expect(result.current.drafts).toEqual({ p2: { weight: '55' } });
   });
 
+  it('clears the weights of the given planned sets and keeps their reps and the other drafts', async () => {
+    const useSetDrafts = await loadHook();
+    const { result } = renderHook(() => useSetDrafts('session-1'));
+    act(() => {
+      result.current.setDraft('p1', { weight: '50', reps: '8' });
+      result.current.setDraft('p2', { weight: '55' });
+      result.current.setDraft('p3', { weight: '60' });
+    });
+
+    act(() => {
+      result.current.clearWeightDrafts(['p1', 'p2']);
+    });
+
+    expect(result.current.drafts).toEqual({ p1: { reps: '8' }, p3: { weight: '60' } });
+  });
+
   it('clears every draft of the session, and the browser storage, when the workout is finished', async () => {
     const useSetDrafts = await loadHook();
     const { result } = renderHook(() => useSetDrafts('session-1'));

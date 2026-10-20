@@ -300,6 +300,50 @@ describe('training handlers', () => {
       expect(response.status).toBe(400);
       expect(await jsonOf(response)).toEqual({ error: 'invalid-body' });
     });
+
+    it('answers 400 invalid-body when the variant is a number', async () => {
+      const { sessionId, plannedSets } = await openSession();
+
+      const response = await log(sessionId, {
+        plannedSetId: plannedSets[0]?.id,
+        reps: 5,
+        weightKg: 40,
+        variantId: 7,
+      });
+
+      expect(response.status).toBe(400);
+      expect(await jsonOf(response)).toEqual({ error: 'invalid-body' });
+    });
+
+    it('records a set meant for the variant the slot shows', async () => {
+      const { sessionId, plannedSets } = await openSession();
+
+      const response = await log(sessionId, {
+        plannedSetId: plannedSets[0]?.id,
+        reps: 5,
+        weightKg: 40,
+        variantId: null,
+      });
+
+      expect(response.status).toBe(200);
+    });
+
+    it('answers 409 variant-changed for a set meant for another variant, writing nothing', async () => {
+      const { sessionId, plannedSets } = await openSession();
+
+      const response = await log(sessionId, {
+        plannedSetId: plannedSets[0]?.id,
+        reps: 5,
+        weightKg: 40,
+        variantId: crypto.randomUUID(),
+      });
+
+      expect(response.status).toBe(409);
+      expect(await jsonOf(response)).toEqual({ error: 'variant-changed' });
+      expect(
+        await testDatabase.db.select().from(setLogs).where(eq(setLogs.workoutSessionId, sessionId)),
+      ).toEqual([]);
+    });
   });
 
   describe('finishing a workout', () => {

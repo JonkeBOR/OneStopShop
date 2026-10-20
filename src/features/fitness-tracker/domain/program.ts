@@ -1,5 +1,6 @@
 import { fail, type Result, succeed } from './result';
 import { parseTargetReps } from './values';
+import type { ParkedWeight } from './variant';
 
 export type PlannedSetDraft = {
   exerciseSlotId: string;
@@ -7,6 +8,8 @@ export type PlannedSetDraft = {
   setNumber: number;
   targetReps: number;
   lastWeightGrams?: number | null;
+  variantId?: string | null;
+  parkedWeights?: readonly ParkedWeight[];
 };
 
 export type PrescriptionChange = {
@@ -54,6 +57,8 @@ export function draftsForNewBlock(
     slotId: string;
     targetReps: readonly number[];
     lastWeightsGrams?: readonly (number | null)[];
+    variantId?: string | null;
+    parkedWeightsBySet?: readonly (readonly ParkedWeight[])[];
   }[],
   newBlockId: string,
 ): PlannedSetDraft[] {
@@ -61,6 +66,8 @@ export function draftsForNewBlock(
     draftsFor(slot.slotId, newBlockId, slot.targetReps).map((draft, index) => ({
       ...draft,
       lastWeightGrams: slot.lastWeightsGrams?.[index] ?? null,
+      variantId: slot.variantId ?? null,
+      parkedWeights: slot.parkedWeightsBySet?.[index] ?? [],
     })),
   );
 }
