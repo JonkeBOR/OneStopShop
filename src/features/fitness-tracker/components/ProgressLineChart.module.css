@@ -1,0 +1,68 @@
+.figure {
+  margin: 0;
+}
+
+.grid {
+  stroke: var(--color-chart-grid);
+}
+
+.axis line {
+  stroke: var(--color-chart-grid);
+}
+
+.figure text {
+  fill: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.line path {
+  stroke: var(--color-chart-line);
+  stroke-width: 2;
+}
+
+.dot {
+  stroke: var(--color-chart-line);
+  fill: var(--color-surface);
+}
+
+.activeDot {
+  stroke: var(--color-surface);
+  fill: var(--color-chart-line);
+}
+
+.cursor {
+  stroke: var(--color-chart-grid);
+}
+
+.band0 path {
+  fill: var(--color-program-band-1);
+}
+
+.band1 path {
+  fill: var(--color-program-band-2);
+}
+
+.band2 path {
+  fill: var(--color-program-band-3);
+}
+
+.band3 path {
+  fill: var(--color-program-band-4);
+}
+
+.band0 path,
+.band1 path,
+.band2 path,
+.band3 path {
+  fill-opacity: 0.35;
+}
+
+.tooltip {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
