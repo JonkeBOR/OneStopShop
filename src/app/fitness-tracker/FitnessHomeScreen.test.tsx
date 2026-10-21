@@ -1,11 +1,24 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { BodyweightChart } from '@/features/fitness-tracker/domain/progress-chart';
 import { overviewFixture } from '@/features/fitness-tracker/components/test-fixtures';
 import { featureStrings } from '@/lib/strings/features';
 import { fitnessStrings } from '@/lib/strings/fitness';
 import { FitnessHomeScreen } from './FitnessHomeScreen';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
+vi.mock('@/features/fitness-tracker/components/ProgressLineChart', () => ({
+  ProgressLineChart: ({ label }: { label: string }) => <figure aria-label={label} />,
+}));
+
+const bodyweightFixture: BodyweightChart = {
+  range: '3m',
+  domain: [0, 2],
+  points: [
+    { time: 0, kg: 80 },
+    { time: 1, kg: 79.5 },
+  ],
+};
 
 function renderHome(overrides: Partial<Parameters<typeof FitnessHomeScreen>[0]> = {}) {
   return render(
@@ -13,6 +26,7 @@ function renderHome(overrides: Partial<Parameters<typeof FitnessHomeScreen>[0]> 
       isWeighInAvailable
       lastEntryKg={74.5}
       overview={overviewFixture()}
+      bodyweight={bodyweightFixture}
       {...overrides}
     />,
   );
@@ -120,5 +134,39 @@ describe('FitnessHomeScreen', () => {
     expect(
       screen.getByRole('textbox', { name: fitnessStrings.home.weighInInputLabel }),
     ).toBeDefined();
+  });
+
+  it('shows the bodyweight chart under the weigh-in row with range links', () => {
+    renderHome();
+
+    expect(
+      screen.getByRole('heading', { name: fitnessStrings.progress.bodyweight.heading }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole('figure', { name: fitnessStrings.progress.bodyweight.chartLabel }),
+    ).toBeDefined();
+    const nav = screen.getByRole('navigation', { name: fitnessStrings.progress.rangeLabel });
+    const threeMonths = within(nav).getByRole('link', {
+      name: fitnessStrings.progress.ranges['3m'],
+    });
+    expect(threeMonths.getAttribute('href')).toBe('/fitness-tracker?range=3m');
+    expect(threeMonths.getAttribute('aria-current')).toBe('page');
+    expect(
+      within(nav)
+        .getByRole('link', { name: fitnessStrings.progress.ranges['1y'] })
+        .getAttribute('href'),
+    ).toBe('/fitness-tracker?range=1y');
+    expect(
+      within(nav)
+        .getByRole('link', { name: fitnessStrings.progress.ranges.all })
+        .getAttribute('href'),
+    ).toBe('/fitness-tracker?range=all');
+  });
+
+  it('shows the bodyweight empty state when the range has no points', () => {
+    renderHome({ bodyweight: { range: '3m', domain: [0, 1], points: [] } });
+
+    expect(screen.getByText(fitnessStrings.progress.bodyweight.empty)).toBeDefined();
+    expect(screen.queryByRole('figure')).toBeNull();
   });
 });
