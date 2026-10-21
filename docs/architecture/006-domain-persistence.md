@@ -94,6 +94,9 @@ part. A per-link score (bench press: chest 10, front delts 5) would be a column 
 
 ### Storage is tested against a real local D1
 
+Superseded for local runs by [010](010-storage-tests-in-memory.md): locally the storage tests now
+run on an in-memory SQLite, and this setup runs in CI.
+
 A third Vitest project, `storage`, runs `src/**/*.storage.test.ts`. A `globalSetup`
 (`vitest.storage-setup.ts`) wipes `.wrangler/test-state`, applies the migrations with
 `wrangler d1 migrations apply --local --persist-to`, and the tests open the same files through

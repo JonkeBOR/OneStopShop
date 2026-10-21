@@ -67,56 +67,40 @@ no-bare-strings discipline and makes them real regression tests for the strings 
 
 Anything that needs a real database to prove - a batch rolling back, a trigger refusing an update, a
 query scoped to one profile - goes in `*.storage.test.ts`, which a third Vitest project (`storage`)
-runs against a local D1. Pure rules do not belong here; keep them in `domain/` and test them
-without a database.
+runs. Pure rules do not belong here; keep them in `domain/` and test them without a database.
 
     npx vitest run --project storage src/features/fitness-tracker/server/training
 
+Locally the storage tests run against an in-memory SQLite (`node:sqlite`) behind a D1-shaped
+adapter, `sqlite-d1-binding.ts`, so drizzle's D1 driver is used unchanged. Each test file gets its
+own database with every migration applied, files run in parallel, and the whole project takes a few
+seconds. A running dev server and a second Vitest run do not interfere.
+
 Open the database with `openTestDatabase()` from
-`src/features/fitness-tracker/server/storage-test-database.ts` in `beforeAll`. The connection is
-opened once and shared by every file, so tests must not depend on rows from other tests: create a
-fresh profile per test with `ensureProfile(db, crypto.randomUUID(), now)`. A test that installs a
-temporary trigger drops it in `finally`. `storage-test-support.ts` has `expectOk`, `messagesOf` and
-`rejectionOf`, and `createProgramFromSpec` for building a program from a short description.
+`src/features/fitness-tracker/server/storage-test-database.ts` in `beforeAll`. A migration test
+that applies migrations itself uses `openEmptyTestDatabase(name)`. Tests in a file share the
+database, so they must not depend on rows from other tests: create a fresh profile per test with
+`ensureProfile(db, crypto.randomUUID(), now)`. A test that installs a temporary trigger drops it in
+`finally`. `storage-test-support.ts` has `expectOk`, `messagesOf` and `rejectionOf`, and
+`createProgramFromSpec` for building a program from a short description.
 
-Never run two Vitest invocations at once: the setup wipes `.wrangler/test-state` at the start of
-each run. See `docs/architecture/006-domain-persistence.md`.
+The adapter copies what the code relies on from D1: foreign keys on, `batch` all or nothing, at
+most 100 bound parameters per statement, and SQLite's error text. `harness.storage.test.ts` pins
+each of these and runs on both backends. See `docs/architecture/010-storage-tests-in-memory.md`.
 
-### Stop the dev server first
+### On Miniflare's D1
 
-A dev server running on http://localhost:3000 makes storage runs fail intermittently with
-`Failed query: …` on tests the change never touched, and a re-run then passes. Before running the
-storage project or `check.ps1`, stop it:
+`STORAGE_TEST_BACKEND=d1` runs the same tests against Miniflare's D1 through `getPlatformProxy`,
+serially, after a setup that wipes `.wrangler/test-state` and applies the migrations through
+wrangler. CI does this on every pull request and before every deploy, and a failure blocks the
+merge. Run it locally only to reproduce a CI failure:
 
-    $listener = (Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue).OwningProcess | Select-Object -First 1
-    if ($listener) { taskkill /PID $listener /T /F }
-    Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue
+    $env:STORAGE_TEST_BACKEND = 'd1'; npx vitest run --project storage; Remove-Item Env:STORAGE_TEST_BACKEND
 
-The last line must print nothing. Tell the user the dev server was stopped so they can restart it
-with `npm run dev`. This applies to Vitest only; `e2e.ps1` needs a dev server and reuses a running
-one.
-
-### EADDRINUSE on Windows
-
-Two storage runs within about two minutes of each other fail dozens of tests with `Failed query: …`
-caused by `connect EADDRINUSE 127.0.0.1:<port>`. The code is not at fault; the machine has run out of
-ephemeral ports.
-
-`getPlatformProxy` reaches D1 over HTTP to a local workerd, and Miniflare's `dispatchFetch` sets
-undici's `reset` flag on every request, closing the connection afterwards (deliberately, in
-`miniflare/src/http/fetch.ts`, to avoid keep-alive races). Every awaited D1 call - `all()`, `run()`,
-`batch()` - therefore opens one loopback connection and leaves one socket in TIME_WAIT for 120
-seconds. Measured on 2026-10-08: one storage run of 223 tests took 57 seconds and left 11,328
-sockets in TIME_WAIT, about 50 per test, against Windows' default range of 16,384 ports. Past about
-300 storage tests a single run will exhaust it on its own. Linux CI reuses loopback ports and is not
-affected.
-
-- **Right now:** wait until `(Get-NetTCPConnection -State TimeWait).Count` is back under about 2,000
-  and run again.
-- **Once per machine:** widen the range from an elevated shell with
-  `netsh int ipv4 set dynamicport tcp start=10000 num=55535`. It persists across reboots.
-- **For good:** `@cloudflare/vitest-pool-workers` runs tests inside workerd with D1 in process and no
-  sockets, but 0.23 needs Vitest ^4.1 and this repo is on Vitest 5.
+On Windows this backend leaves one socket in TIME_WAIT for 120 s per query, about 15,000 per run, so
+a second run within two minutes fails with `EADDRINUSE`, and a running dev server makes failures
+more likely. Wait until `(Get-NetTCPConnection -State TimeWait).Count` is under about 2,000 first,
+and never run two Vitest invocations at once on this backend.
 
 For a domain-only feature (constitution 2.1.0) the spec's acceptance scenarios are written first as
 tests like these and are the feature's acceptance tests.

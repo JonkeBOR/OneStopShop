@@ -1,10 +1,9 @@
-import { readFile, rm } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { getPlatformProxy } from 'wrangler';
-import { createDatabase, type Database } from '@/lib/server/database';
+import type { Database } from '@/lib/server/database';
+import { openEmptyTestDatabase } from './storage-test-database';
 
-const persistPath = '.wrangler/test-state/migration-v3';
 const statementBreakpoint = '--> statement-breakpoint';
 
 async function runMigrationFile(db: Database, fileName: string): Promise<void> {
@@ -60,10 +59,7 @@ describe('cycle container migration', () => {
   let setLogsBefore: unknown[];
 
   beforeAll(async () => {
-    await rm(persistPath, { recursive: true, force: true });
-    const proxy = await getPlatformProxy<{ DB: unknown }>({ persist: { path: persistPath } });
-    dispose = () => proxy.dispose();
-    db = createDatabase(proxy.env.DB);
+    ({ db, dispose } = await openEmptyTestDatabase('migration-v3'));
     await runMigrationFile(db, '0000_fitness_domain.sql');
     await runMigrationFile(db, '0001_set_log_immutability.sql');
     await runMigrationFile(db, '0002_cycle_container_columns.sql');

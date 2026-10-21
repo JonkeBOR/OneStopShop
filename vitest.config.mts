@@ -6,6 +6,16 @@ const serverOnlyStub = fileURLToPath(
   new URL('./node_modules/server-only/empty.js', import.meta.url),
 );
 
+const miniflareStorageSettings = {
+  globalSetup: ['./vitest.storage-setup.ts'],
+  fileParallelism: false,
+  isolate: false,
+  maxWorkers: 1,
+  sequence: { groupOrder: 1 },
+};
+
+const storageOnMiniflare = process.env.STORAGE_TEST_BACKEND === 'd1';
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -35,13 +45,9 @@ export default defineConfig({
           name: 'storage',
           environment: 'node',
           include: ['src/**/*.storage.test.ts'],
-          globalSetup: ['./vitest.storage-setup.ts'],
           testTimeout: 30000,
           hookTimeout: 60000,
-          fileParallelism: false,
-          isolate: false,
-          maxWorkers: 1,
-          sequence: { groupOrder: 1 },
+          ...(storageOnMiniflare ? miniflareStorageSettings : {}),
         },
       },
       {

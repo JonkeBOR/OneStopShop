@@ -1,10 +1,9 @@
-import { readFile, readdir, rm } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { sql } from 'drizzle-orm';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { getPlatformProxy } from 'wrangler';
-import { createDatabase, type Database } from '@/lib/server/database';
+import type { Database } from '@/lib/server/database';
+import { openEmptyTestDatabase } from './storage-test-database';
 
-const persistPath = '.wrangler/test-state/migration-body-part-roles';
 const statementBreakpoint = '--> statement-breakpoint';
 const roleMigration = '0008_body_part_roles.sql';
 
@@ -27,10 +26,7 @@ describe('body part roles migration', () => {
   let dispose: () => Promise<void>;
 
   beforeAll(async () => {
-    await rm(persistPath, { recursive: true, force: true });
-    const proxy = await getPlatformProxy<{ DB: unknown }>({ persist: { path: persistPath } });
-    dispose = () => proxy.dispose();
-    db = createDatabase(proxy.env.DB);
+    ({ db, dispose } = await openEmptyTestDatabase('migration-body-part-roles'));
     for (const fileName of await migrationsBefore(roleMigration)) {
       await runMigrationFile(db, fileName);
     }
