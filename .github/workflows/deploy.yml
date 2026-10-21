@@ -40,6 +40,8 @@ jobs:
 
       - name: Quality gate
         run: pwsh -NoProfile -File scripts/check.ps1
+        env:
+          STORAGE_TEST_BACKEND: d1
 
       - name: Apply D1 migrations
         run: npx wrangler d1 migrations apply onestopshop --remote

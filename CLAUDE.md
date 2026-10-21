@@ -30,7 +30,8 @@ icons and iOS metadata so the app installs to the Home Screen and launches in st
 
 Testing exists: Vitest for unit tests colocated as `src/**/*.test.ts(x)` (a `node` project for
 `src/lib/`, `src/features/` and route handlers, a `jsdom` project for components, and a `storage`
-project for `*.storage.test.ts` files that run against a real local D1), Playwright for end-to-end
+project for `*.storage.test.ts` files that run against an in-memory SQLite locally and against
+Miniflare's D1 in CI, see [010](docs/architecture/010-storage-tests-in-memory.md)), Playwright for end-to-end
 tests in `e2e/` that sign in by minting a session cookie, and a Playwright MCP browser configured in
 `.mcp.json`.
 
@@ -73,10 +74,12 @@ set is logged. See
 Deployment is continuous: `.github/workflows/deploy.yml` runs the gate, the remote D1 migrations
 and the OpenNext build and deploy on every push to `main`. Merging is deploying. There is no local
 deploy script, because OpenNext bundles every `.env*` file into the Worker. See
-[005-continuous-deployment.md](docs/architecture/005-continuous-deployment.md).
+[005-continuous-deployment.md](docs/architecture/005-continuous-deployment.md). Every pull request
+into `main` runs `.github/workflows/check.yml`, the same gate with the storage tests on Miniflare's
+D1, and a red check blocks the merge.
 
 Not built yet: views of past passes, workouts and sessions, progress charts, bodyweight history,
-`src/components/`, and checks on pull requests. Those are created when they have a real occupant, not
+`src/components/`, and end-to-end tests in CI. Those are created when they have a real occupant, not
 before.
 
 ## Commands
