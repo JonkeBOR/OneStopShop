@@ -71,6 +71,13 @@
       "when": 1792449299951,
       "tag": "0009_exercise_variants",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1792605528099,
+      "tag": "0010_program_soft_delete",
+      "breakpoints": true
     }
   ]
 }

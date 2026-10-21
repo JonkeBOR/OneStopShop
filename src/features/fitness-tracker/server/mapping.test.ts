@@ -118,7 +118,7 @@ describe('toProgram', () => {
   };
 
   const rows: ProgramRows = {
-    program: { id: 'pr', profileId: 'p', name: 'Upper/Lower', createdAt: at },
+    program: { id: 'pr', profileId: 'p', name: 'Upper/Lower', createdAt: at, deletedAt: null },
     isActive: true,
     blocks: [
       { id: 'b2', programId: 'pr', position: 2, label: 'Deload' },

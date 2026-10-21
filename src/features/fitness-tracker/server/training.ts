@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Database } from '@/lib/server/database';
 import { decideLogSet, prefill } from '../domain/logging';
 import { blockStatuses, decideAfterFinish } from '../domain/progression';
@@ -51,7 +51,13 @@ async function loadActiveContext(db: Database, profileId: string): Promise<Activ
   const [program] = await db
     .select({ name: programs.name })
     .from(programs)
-    .where(and(eq(programs.id, programId), eq(programs.profileId, profileId)))
+    .where(
+      and(
+        eq(programs.id, programId),
+        eq(programs.profileId, profileId),
+        isNull(programs.deletedAt),
+      ),
+    )
     .limit(1);
   const [cycle] = await db.select().from(cycles).where(eq(cycles.programId, programId)).limit(1);
   if (!program || !cycle) {

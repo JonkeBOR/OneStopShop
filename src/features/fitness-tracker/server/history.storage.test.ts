@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Program } from '../domain/types';
 import { activateProgram } from './activation';
@@ -7,15 +7,28 @@ import { getExerciseHistory } from './history';
 import { ensureProfile } from './profile';
 import {
   addWorkout,
+  createProgram,
   deleteProgram,
   getProgram,
+  listPrograms,
   removeTrainingBlock,
+  renameProgram,
   removeWorkout,
   renameWorkout,
   replaceSlotExercise,
   setPrescription,
 } from './programs';
-import { plannedSets, profiles, setLogs, workoutSessions } from './schema';
+import {
+  cycles,
+  exerciseSlots,
+  plannedSets,
+  profiles,
+  programs,
+  setLogs,
+  trainingBlocks,
+  workoutSessions,
+  workouts,
+} from './schema';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
 import {
   createProgramFromSpec,
@@ -191,6 +204,76 @@ describe('editing programs without losing history', () => {
     );
     expect(history.exercise.name).toBe('Seal row');
     expect(history.setLogs).toHaveLength(2);
+  });
+
+  it('deleting a program keeps its row and name with deleted_at set, and removes its blocks, workouts, slots and cycle', async () => {
+    const { db } = testDatabase;
+    const program = await activate(twoWorkouts);
+    const deletedAt = tick();
+
+    expectOk(await deleteProgram(db, profileId, program.id, deletedAt));
+
+    const programRows = await db.select().from(programs).where(eq(programs.id, program.id));
+    expect(programRows).toHaveLength(1);
+    expect(programRows[0]).toMatchObject({ name: program.name, deletedAt });
+    expect(
+      await db.select().from(trainingBlocks).where(eq(trainingBlocks.programId, program.id)),
+    ).toEqual([]);
+    expect(await db.select().from(workouts).where(eq(workouts.programId, program.id))).toEqual([]);
+    expect(
+      await db
+        .select()
+        .from(exerciseSlots)
+        .where(
+          inArray(
+            exerciseSlots.workoutId,
+            program.workouts.map((workout) => workout.id),
+          ),
+        ),
+    ).toEqual([]);
+    expect(await db.select().from(cycles).where(eq(cycles.programId, program.id))).toEqual([]);
+  });
+
+  it('a deleted program is not found by getProgram, listPrograms, renameProgram, addWorkout or activateProgram, and deleting it again is not-found', async () => {
+    const { db } = testDatabase;
+    const program = await activate(twoWorkouts);
+    expectOk(await deleteProgram(db, profileId, program.id, tick()));
+    const notFound = { ok: false, error: 'not-found' };
+
+    expect(await getProgram(db, profileId, program.id)).toEqual(notFound);
+    expect(await listPrograms(db, profileId)).toEqual([]);
+    expect(await renameProgram(db, profileId, program.id, { name: 'Other name' })).toEqual(
+      notFound,
+    );
+    expect(await addWorkout(db, profileId, program.id, { name: 'Late' })).toEqual(notFound);
+    expect(await activateProgram(db, profileId, program.id, tick())).toEqual(notFound);
+    expect(await deleteProgram(db, profileId, program.id, tick())).toEqual(notFound);
+  });
+
+  it("a deleted program's name can be reused", async () => {
+    const { db } = testDatabase;
+    const program = await activate(twoWorkouts);
+    expectOk(await deleteProgram(db, profileId, program.id, tick()));
+
+    const again = expectOk(
+      await createProgram(db, profileId, { name: program.name, blockCount: 1 }, tick()),
+    );
+
+    expect(again.id).not.toBe(program.id);
+    expect((await listPrograms(db, profileId)).map((entry) => entry.name)).toEqual([program.name]);
+  });
+
+  it('an exercise used only in a deleted program can be deleted', async () => {
+    const { db } = testDatabase;
+    const program = await activate(twoWorkouts);
+    const exerciseId = program.workouts[1]?.slots[0]?.exercise.id ?? '';
+    expect(await deleteExercise(db, profileId, exerciseId)).toEqual({
+      ok: false,
+      error: 'exercise-in-use',
+    });
+    expectOk(await deleteProgram(db, profileId, program.id, tick()));
+
+    expectOk(await deleteExercise(db, profileId, exerciseId));
   });
 
   it('deleting the active program leaves no active program and closes its open session as finished', async () => {

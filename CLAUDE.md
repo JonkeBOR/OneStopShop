@@ -65,11 +65,13 @@ to a name-only `…/new` page that then opens the edit page, as workouts are; pr
 per profile and workout names per program. An exercise can have variants (one per gym or
 machine): the slot's selected variant and its weight sit on the planned sets, the other variants'
 weights are parked in `planned_set_variant_weights`, and the variant is switched mid-session until a
-set is logged. See
+set is logged. Deleting a program is a soft delete: its row stays as a tombstone with its name and
+`deleted_at`, its plan is removed, and every program operation treats it as not found. See
 [006-domain-persistence.md](docs/architecture/006-domain-persistence.md),
 [007-cycle-as-container-and-bff.md](docs/architecture/007-cycle-as-container-and-bff.md),
-[008-weekly-volume-estimate.md](docs/architecture/008-weekly-volume-estimate.md) and
-[009-exercise-variants.md](docs/architecture/009-exercise-variants.md).
+[008-weekly-volume-estimate.md](docs/architecture/008-weekly-volume-estimate.md),
+[009-exercise-variants.md](docs/architecture/009-exercise-variants.md) and
+[011-progress-charts.md](docs/architecture/011-progress-charts.md).
 
 Deployment is continuous: `.github/workflows/deploy.yml` runs the gate, the remote D1 migrations
 and the OpenNext build and deploy on every push to `main`. Merging is deploying. There is no local

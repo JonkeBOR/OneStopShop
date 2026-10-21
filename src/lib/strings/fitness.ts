@@ -56,6 +56,26 @@ export const fitnessStrings = {
     noActiveProgram: 'No active program',
     chooseProgram: 'Choose a program to start training.',
   },
+  progress: {
+    rangeLabel: 'Chart range',
+    ranges: { '3m': '3M', '1y': '1Y', all: 'All' },
+    variantLabel: 'Variant',
+    noVariant: 'No variant',
+    legendLabel: 'Programs',
+    deletedProgram: (name: string) => `${name} (deleted)`,
+    tooltip: (date: string, kg: string) => `${date} · ${kg} kg`,
+    bodyweight: {
+      heading: 'Bodyweight',
+      chartLabel: 'Bodyweight chart',
+      empty: 'No weigh-ins in this range yet. Weigh in to start the chart.',
+    },
+    oneRepMax: {
+      heading: 'Estimated 1RM',
+      chartLabel: 'Estimated 1RM chart',
+      note: 'Estimated from the best set of each session.',
+      empty: 'No weighted sets of 1–12 reps in this range yet. Log a workout to start the chart.',
+    },
+  },
   programs: {
     title: 'Programs',
     add: 'Add program',
