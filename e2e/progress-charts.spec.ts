@@ -77,6 +77,11 @@ test('the home screen charts bodyweight and the exercise page charts estimated 1
   await expect(legend).toContainText(programName);
 
   await page.goto(programUrl);
+  await page.getByRole('button', { name: fitnessStrings.programEdit.pause }).click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: fitnessStrings.activeProgram.pauseConfirmLabel })
+    .click();
   await page.getByRole('button', { name: fitnessStrings.programEdit.deleteProgram }).click();
   await page
     .getByRole('dialog')

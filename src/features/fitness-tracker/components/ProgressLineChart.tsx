@@ -30,7 +30,6 @@ type ProgressLineChartProps = {
 
 const CHART_HEIGHT = 220;
 const INITIAL_WIDTH = 320;
-const Y_AXIS_WIDTH = 44;
 const chartMargin = { top: 8, right: 16, bottom: 0, left: 0 };
 
 const bandClasses = [styles.band0, styles.band1, styles.band2, styles.band3];
@@ -78,7 +77,7 @@ export function ProgressLineChart({ label, points, domain, bands = [] }: Progres
             domain={['auto', 'auto']}
             tickFormatter={formatKg}
             className={styles.axis}
-            width={Y_AXIS_WIDTH}
+            width="auto"
             tickLine={false}
           />
           <Tooltip content={ChartTooltip} cursor={{ className: styles.cursor }} />
