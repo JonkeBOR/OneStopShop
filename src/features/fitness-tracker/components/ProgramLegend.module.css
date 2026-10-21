@@ -1,0 +1,42 @@
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.entry {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.swatch {
+  inline-size: 0.875rem;
+  block-size: 0.875rem;
+  border-radius: 2px;
+}
+
+.swatch0 {
+  background-color: color-mix(in srgb, var(--color-program-band-1) 35%, transparent);
+  border: 1px solid var(--color-program-band-1);
+}
+
+.swatch1 {
+  background-color: color-mix(in srgb, var(--color-program-band-2) 35%, transparent);
+  border: 1px solid var(--color-program-band-2);
+}
+
+.swatch2 {
+  background-color: color-mix(in srgb, var(--color-program-band-3) 35%, transparent);
+  border: 1px solid var(--color-program-band-3);
+}
+
+.swatch3 {
+  background-color: color-mix(in srgb, var(--color-program-band-4) 35%, transparent);
+  border: 1px solid var(--color-program-band-4);
+}

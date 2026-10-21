@@ -26,6 +26,12 @@
   --color-volume-low: #f2a900;
   --color-volume-target: #2e9e5b;
   --color-volume-high: #d32f2f;
+  --color-chart-line: #522b5b;
+  --color-chart-grid: #ecc9c1;
+  --color-program-band-1: #6f9fd8;
+  --color-program-band-2: #e8a33d;
+  --color-program-band-3: #4fae76;
+  --color-program-band-4: #b07cd8;
 
   --space-1: 0.25rem;
   --space-2: 0.5rem;
@@ -80,6 +86,12 @@
     --color-volume-low: #f5b833;
     --color-volume-target: #4cc27e;
     --color-volume-high: #ff5a4f;
+    --color-chart-line: #dfb6b2;
+    --color-chart-grid: #2a2d37;
+    --color-program-band-1: #5b8fd6;
+    --color-program-band-2: #d99a3c;
+    --color-program-band-3: #46b07a;
+    --color-program-band-4: #a67ad6;
   }
 }
 

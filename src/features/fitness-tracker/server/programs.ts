@@ -1,5 +1,5 @@
 import 'server-only';
-import { and, asc, count, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { Database } from '@/lib/server/database';
 import { canUseInSlot } from '../domain/exercise';
@@ -54,7 +54,11 @@ export async function loadProgramRows(
   programId: string,
 ): Promise<ProgramRows | null> {
   const found = await db.query.programs.findFirst({
-    where: and(eq(programs.id, programId), eq(programs.profileId, profileId)),
+    where: and(
+      eq(programs.id, programId),
+      eq(programs.profileId, profileId),
+      isNull(programs.deletedAt),
+    ),
     with: {
       blocks: true,
       workouts: { with: { slots: { with: { exercise: true, plannedSets: true } } } },
@@ -109,8 +113,12 @@ async function otherProgramNames(
 ): Promise<string[]> {
   const scope =
     exceptProgramId === null
-      ? eq(programs.profileId, profileId)
-      : and(eq(programs.profileId, profileId), ne(programs.id, exceptProgramId));
+      ? and(eq(programs.profileId, profileId), isNull(programs.deletedAt))
+      : and(
+          eq(programs.profileId, profileId),
+          isNull(programs.deletedAt),
+          ne(programs.id, exceptProgramId),
+        );
   const rows = await db.select({ name: programs.name }).from(programs).where(scope);
   return rows.map((row) => row.name);
 }
@@ -267,7 +275,7 @@ export async function listPrograms(db: Database, profileId: string): Promise<Pro
     db
       .select({ id: programs.id, name: programs.name })
       .from(programs)
-      .where(eq(programs.profileId, profileId))
+      .where(and(eq(programs.profileId, profileId), isNull(programs.deletedAt)))
       .orderBy(asc(programs.createdAt), asc(programs.id)),
     db
       .select({ programId: trainingBlocks.programId, total: count() })
@@ -356,7 +364,13 @@ export async function renameProgram(
   const [row] = await db
     .update(programs)
     .set({ name: name.value })
-    .where(and(eq(programs.id, programId), eq(programs.profileId, profileId)))
+    .where(
+      and(
+        eq(programs.id, programId),
+        eq(programs.profileId, profileId),
+        isNull(programs.deletedAt),
+      ),
+    )
     .returning({ id: programs.id });
   return row ? getProgram(db, profileId, programId) : fail('not-found');
 }
@@ -1163,7 +1177,13 @@ export async function deleteProgram(
   const [program] = await db
     .select({ id: programs.id })
     .from(programs)
-    .where(and(eq(programs.id, programId), eq(programs.profileId, profileId)))
+    .where(
+      and(
+        eq(programs.id, programId),
+        eq(programs.profileId, profileId),
+        isNull(programs.deletedAt),
+      ),
+    )
     .limit(1);
   if (!program) {
     return fail('not-found');
@@ -1179,7 +1199,10 @@ export async function deleteProgram(
       .where(
         and(eq(workoutSessions.programId, programId), eq(workoutSessions.status, 'in_progress')),
       ),
-    db.delete(programs).where(eq(programs.id, programId)),
+    db.delete(workouts).where(eq(workouts.programId, programId)),
+    db.delete(trainingBlocks).where(eq(trainingBlocks.programId, programId)),
+    db.delete(cycles).where(eq(cycles.programId, programId)),
+    db.update(programs).set({ deletedAt: now }).where(eq(programs.id, programId)),
   ]);
   return succeed(undefined);
 }

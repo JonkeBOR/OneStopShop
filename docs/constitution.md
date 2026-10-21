@@ -76,15 +76,16 @@ After that, every schema change MUST go through it. Authentication:
 **Google OAuth** for identity only, using the developer's own Google account/Google Cloud project.
 Testing: **Vitest** for unit tests and **Playwright** (mobile WebKit) for end-to-end tests, with a
 **Playwright MCP** browser for exploratory checks, as recorded in
-`docs/architecture/002-testing-strategy.md`. Google Sheets and the Google Sheets API are not part
-of the stack. Any change to this stack is a deliberate architectural decision and MUST be reflected
-here and in `docs/architecture/`.
+`docs/architecture/002-testing-strategy.md`. Charting: **Recharts**, rendered only in small Client
+Components that take server-built props, as recorded in `docs/architecture/011-progress-charts.md`.
+Google Sheets and the Google Sheets API are not part of the stack. Any change to this stack is a
+deliberate architectural decision and MUST be reflected here and in `docs/architecture/`.
 
 ## Incremental Decisions
 
 The following remain intentionally undecided until actually needed, per Principle I: exact Google
 OAuth library/session-management implementation, database schema beyond what a feature needs,
-API endpoint design, data/repository abstraction, UI/component architecture, charting library, offline
+API endpoint design, data/repository abstraction, UI/component architecture, offline
 support, error handling strategy, and pull-request checks. Each MUST be decided incrementally,
 at the point of implementation, rather than speculatively up front — and each cross-cutting
 decision should be captured in `docs/architecture/` once made. Feature-scoped decisions live in
@@ -120,4 +121,4 @@ Every change MUST be checked against these principles; any deviation MUST be jus
 and the architecture decisions under `docs/architecture/` for detailed runtime/architecture
 guidance that supplements, but does not override, this constitution.
 
-**Version**: 2.2.0 | **Ratified**: 2026-09-09 | **Last Amended**: 2026-10-08
+**Version**: 2.3.0 | **Ratified**: 2026-09-09 | **Last Amended**: 2026-10-21

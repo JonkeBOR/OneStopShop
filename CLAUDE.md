@@ -65,11 +65,15 @@ to a name-only `…/new` page that then opens the edit page, as workouts are; pr
 per profile and workout names per program. An exercise can have variants (one per gym or
 machine): the slot's selected variant and its weight sit on the planned sets, the other variants'
 weights are parked in `planned_set_variant_weights`, and the variant is switched mid-session until a
-set is logged. See
+set is logged. Deleting a program is a soft delete: its row stays as a tombstone with its name and
+`deleted_at`, its plan is removed, and every program operation treats it as not found. The home
+page has a bodyweight chart and the exercise page an estimated-1RM chart with program bands, built
+with Recharts from `domain/progress-chart.ts`. See
 [006-domain-persistence.md](docs/architecture/006-domain-persistence.md),
 [007-cycle-as-container-and-bff.md](docs/architecture/007-cycle-as-container-and-bff.md),
-[008-weekly-volume-estimate.md](docs/architecture/008-weekly-volume-estimate.md) and
-[009-exercise-variants.md](docs/architecture/009-exercise-variants.md).
+[008-weekly-volume-estimate.md](docs/architecture/008-weekly-volume-estimate.md),
+[009-exercise-variants.md](docs/architecture/009-exercise-variants.md) and
+[011-progress-charts.md](docs/architecture/011-progress-charts.md).
 
 Deployment is continuous: `.github/workflows/deploy.yml` runs the gate, the remote D1 migrations
 and the OpenNext build and deploy on every push to `main`. Merging is deploying. There is no local
@@ -78,9 +82,8 @@ deploy script, because OpenNext bundles every `.env*` file into the Worker. See
 into `main` runs `.github/workflows/check.yml`, the same gate with the storage tests on Miniflare's
 D1, and a red check blocks the merge.
 
-Not built yet: views of past passes, workouts and sessions, progress charts, bodyweight history,
-`src/components/`, and end-to-end tests in CI. Those are created when they have a real occupant, not
-before.
+Not built yet: views of past passes, workouts and sessions, `src/components/`, and end-to-end tests
+in CI. Those are created when they have a real occupant, not before.
 
 ## Commands
 

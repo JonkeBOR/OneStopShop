@@ -1,11 +1,26 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import type { BodyweightChart } from '@/features/fitness-tracker/domain/progress-chart';
 import { overviewFixture } from '@/features/fitness-tracker/components/test-fixtures';
 import { featureStrings } from '@/lib/strings/features';
 import { fitnessStrings } from '@/lib/strings/fitness';
 import { FitnessHomeScreen } from './FitnessHomeScreen';
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
+const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
+
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
+vi.mock('@/features/fitness-tracker/components/ProgressLineChart', () => ({
+  ProgressLineChart: ({ label }: { label: string }) => <figure aria-label={label} />,
+}));
+
+const bodyweightFixture: BodyweightChart = {
+  range: '3m',
+  domain: [0, 2],
+  points: [
+    { time: 0, kg: 80 },
+    { time: 1, kg: 79.5 },
+  ],
+};
 
 function renderHome(overrides: Partial<Parameters<typeof FitnessHomeScreen>[0]> = {}) {
   return render(
@@ -13,6 +28,7 @@ function renderHome(overrides: Partial<Parameters<typeof FitnessHomeScreen>[0]> 
       isWeighInAvailable
       lastEntryKg={74.5}
       overview={overviewFixture()}
+      bodyweight={bodyweightFixture}
       {...overrides}
     />,
   );
@@ -120,5 +136,46 @@ describe('FitnessHomeScreen', () => {
     expect(
       screen.getByRole('textbox', { name: fitnessStrings.home.weighInInputLabel }),
     ).toBeDefined();
+  });
+
+  it('shows the bodyweight chart under the weigh-in row with a range dropdown', () => {
+    renderHome();
+
+    expect(
+      screen.getByRole('heading', { name: fitnessStrings.progress.bodyweight.heading }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole('figure', { name: fitnessStrings.progress.bodyweight.chartLabel }),
+    ).toBeDefined();
+    const range = screen.getByRole<HTMLSelectElement>('combobox', {
+      name: fitnessStrings.progress.rangeLabel,
+    });
+    expect(range.value).toBe('3m');
+    expect(
+      within(range)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual([
+      fitnessStrings.progress.ranges['3m'],
+      fitnessStrings.progress.ranges['1y'],
+      fitnessStrings.progress.ranges.all,
+    ]);
+  });
+
+  it('switches the bodyweight range from the dropdown', () => {
+    renderHome();
+
+    fireEvent.change(screen.getByRole('combobox', { name: fitnessStrings.progress.rangeLabel }), {
+      target: { value: 'all' },
+    });
+
+    expect(router.push).toHaveBeenCalledWith('/fitness-tracker?range=all', { scroll: false });
+  });
+
+  it('shows the bodyweight empty state when the range has no points', () => {
+    renderHome({ bodyweight: { range: '3m', domain: [0, 1], points: [] } });
+
+    expect(screen.getByText(fitnessStrings.progress.bodyweight.empty)).toBeDefined();
+    expect(screen.queryByRole('figure')).toBeNull();
   });
 });

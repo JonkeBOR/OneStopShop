@@ -77,6 +77,7 @@ export const programs = sqliteTable('programs', {
     .references(() => profiles.id),
   name: text('name').notNull(),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+  deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
 });
 
 export const trainingBlocks = sqliteTable(
