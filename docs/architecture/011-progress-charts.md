@@ -35,8 +35,10 @@ The charts are drawn with Recharts 3 (`recharts` 3.10.1, with its `react-is` 19 
 chose it. One small Client Component, `ProgressLineChart`, wraps it, because Recharts needs the
 client. It takes points, a time domain and program bands as props that the Server Component has
 already calculated in `domain/progress-chart.ts`, does no maths of its own, and calls no `/api/*`
-route. The range links (`FilterLinks`) and the program legend (`ProgramLegend`) are Server
-Components in the app's own markup, so their text stays in the strings module. Recharts' `Legend` is
+route. The range and variant dropdowns (`ChartFilters`) are native `<select>`s that navigate to the
+chosen search parameters, so iOS opens its own full-width picker and the server still builds the
+chart. They and the program legend (`ProgramLegend`) are the app's own markup, so their text stays
+in the strings module. Recharts' `Legend` is
 not used, because it describes data series rather than reference areas.
 
 Animations are off (`isAnimationActive={false}`): a history chart that draws itself on every visit

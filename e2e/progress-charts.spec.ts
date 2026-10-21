@@ -92,7 +92,9 @@ test('the home screen charts bodyweight and the exercise page charts estimated 1
   await openExercise(page, exerciseName);
   await expect(legend).toContainText(progress.deletedProgram(programName));
 
-  await page.getByRole('link', { name: progress.ranges.all }).click();
+  await page
+    .getByRole('combobox', { name: progress.rangeLabel })
+    .selectOption({ label: progress.ranges.all });
   await expect(page).toHaveURL(/range=all/);
   await expect(oneRepMaxChart).toBeVisible();
 });

@@ -6,7 +6,9 @@ import { featureStrings } from '@/lib/strings/features';
 import { fitnessStrings } from '@/lib/strings/fitness';
 import { FitnessHomeScreen } from './FitnessHomeScreen';
 
-vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }) }));
+const router = vi.hoisted(() => ({ refresh: vi.fn(), push: vi.fn() }));
+
+vi.mock('next/navigation', () => ({ useRouter: () => router }));
 vi.mock('@/features/fitness-tracker/components/ProgressLineChart', () => ({
   ProgressLineChart: ({ label }: { label: string }) => <figure aria-label={label} />,
 }));
@@ -136,7 +138,7 @@ describe('FitnessHomeScreen', () => {
     ).toBeDefined();
   });
 
-  it('shows the bodyweight chart under the weigh-in row with range links', () => {
+  it('shows the bodyweight chart under the weigh-in row with a range dropdown', () => {
     renderHome();
 
     expect(
@@ -145,22 +147,29 @@ describe('FitnessHomeScreen', () => {
     expect(
       screen.getByRole('figure', { name: fitnessStrings.progress.bodyweight.chartLabel }),
     ).toBeDefined();
-    const nav = screen.getByRole('navigation', { name: fitnessStrings.progress.rangeLabel });
-    const threeMonths = within(nav).getByRole('link', {
-      name: fitnessStrings.progress.ranges['3m'],
+    const range = screen.getByRole<HTMLSelectElement>('combobox', {
+      name: fitnessStrings.progress.rangeLabel,
     });
-    expect(threeMonths.getAttribute('href')).toBe('/fitness-tracker?range=3m');
-    expect(threeMonths.getAttribute('aria-current')).toBe('page');
+    expect(range.value).toBe('3m');
     expect(
-      within(nav)
-        .getByRole('link', { name: fitnessStrings.progress.ranges['1y'] })
-        .getAttribute('href'),
-    ).toBe('/fitness-tracker?range=1y');
-    expect(
-      within(nav)
-        .getByRole('link', { name: fitnessStrings.progress.ranges.all })
-        .getAttribute('href'),
-    ).toBe('/fitness-tracker?range=all');
+      within(range)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual([
+      fitnessStrings.progress.ranges['3m'],
+      fitnessStrings.progress.ranges['1y'],
+      fitnessStrings.progress.ranges.all,
+    ]);
+  });
+
+  it('switches the bodyweight range from the dropdown', () => {
+    renderHome();
+
+    fireEvent.change(screen.getByRole('combobox', { name: fitnessStrings.progress.rangeLabel }), {
+      target: { value: 'all' },
+    });
+
+    expect(router.push).toHaveBeenCalledWith('/fitness-tracker?range=all', { scroll: false });
   });
 
   it('shows the bodyweight empty state when the range has no points', () => {

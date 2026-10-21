@@ -323,30 +323,35 @@ describe('ExerciseEditScreen', () => {
       expect(screen.getByText(progress.oneRepMax.note)).toBeDefined();
     });
 
-    it('links ranges and keeps the selected variant', () => {
+    function choose(label: string, value: string) {
+      fireEvent.change(screen.getByRole('combobox', { name: label }), { target: { value } });
+    }
+
+    it('switches range from a dropdown and keeps the selected variant', () => {
       renderScreen({}, oneRepMax({ selectedParam: 'v1' }));
 
-      const nav = screen.getByRole('navigation', { name: progress.rangeLabel });
-      const threeMonths = within(nav).getByRole('link', { name: progress.ranges['3m'] });
-      expect(threeMonths.getAttribute('aria-current')).toBe('page');
-      expect(threeMonths.getAttribute('href')).toBe(
-        '/fitness-tracker/exercises/e1?range=3m&variant=v1',
-      );
       expect(
-        within(nav).getByRole('link', { name: progress.ranges['1y'] }).getAttribute('href'),
-      ).toBe('/fitness-tracker/exercises/e1?range=1y&variant=v1');
+        screen.getByRole<HTMLSelectElement>('combobox', { name: progress.rangeLabel }).value,
+      ).toBe('3m');
+      choose(progress.rangeLabel, '1y');
+
+      expect(router.push).toHaveBeenCalledWith(
+        '/fitness-tracker/exercises/e1?range=1y&variant=v1',
+        { scroll: false },
+      );
     });
 
-    it('links ranges without a variant when no series is selected', () => {
+    it('switches range without a variant when no series is selected', () => {
       renderScreen({}, emptyOneRepMax);
 
-      const nav = screen.getByRole('navigation', { name: progress.rangeLabel });
-      expect(
-        within(nav).getByRole('link', { name: progress.ranges.all }).getAttribute('href'),
-      ).toBe('/fitness-tracker/exercises/e1?range=all');
+      choose(progress.rangeLabel, 'all');
+
+      expect(router.push).toHaveBeenCalledWith('/fitness-tracker/exercises/e1?range=all', {
+        scroll: false,
+      });
     });
 
-    it('shows variant chips only when there are several series, with "No variant" for the null series', () => {
+    it('shows a variant dropdown beside the range only when there are several series, with "No variant" for the null series', () => {
       renderScreen(
         {},
         oneRepMax({
@@ -358,19 +363,27 @@ describe('ExerciseEditScreen', () => {
         }),
       );
 
-      const nav = screen.getByRole('navigation', { name: progress.variantLabel });
-      const gymA = within(nav).getByRole('link', { name: 'Gym A' });
-      expect(gymA.getAttribute('aria-current')).toBe('page');
-      expect(gymA.getAttribute('href')).toBe('/fitness-tracker/exercises/e1?range=3m&variant=v1');
-      expect(within(nav).getByRole('link', { name: progress.noVariant }).getAttribute('href')).toBe(
+      const variant = screen.getByRole<HTMLSelectElement>('combobox', {
+        name: progress.variantLabel,
+      });
+      expect(variant.value).toBe('v1');
+      expect(
+        within(variant)
+          .getAllByRole('option')
+          .map((option) => option.textContent),
+      ).toEqual(['Gym A', progress.noVariant]);
+      choose(progress.variantLabel, 'none');
+
+      expect(router.push).toHaveBeenCalledWith(
         '/fitness-tracker/exercises/e1?range=3m&variant=none',
+        { scroll: false },
       );
     });
 
-    it('shows no variant chips for a single series', () => {
+    it('shows no variant dropdown for a single series', () => {
       renderScreen({}, oneRepMax());
 
-      expect(screen.queryByRole('navigation', { name: progress.variantLabel })).toBeNull();
+      expect(screen.queryByRole('combobox', { name: progress.variantLabel })).toBeNull();
     });
 
     it('shows the program legend with deleted programs marked', () => {

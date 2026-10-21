@@ -58,7 +58,7 @@ export const fitnessStrings = {
   },
   progress: {
     rangeLabel: 'Chart range',
-    ranges: { '3m': '3M', '1y': '1Y', all: 'All' },
+    ranges: { '3m': '3 months', '1y': '1 year', all: 'All time' },
     variantLabel: 'Variant',
     noVariant: 'No variant',
     legendLabel: 'Programs',

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { FilterLinks } from '@/features/fitness-tracker/components/FilterLinks';
+import { ChartFilters } from '@/features/fitness-tracker/components/ChartFilters';
 import { ProgressLineChart } from '@/features/fitness-tracker/components/ProgressLineChart';
 import { Screen } from '@/features/fitness-tracker/components/Screen';
 import { WeighInRow } from '@/features/fitness-tracker/components/WeighInRow';
@@ -43,16 +43,19 @@ function ActiveProgramCard({ overview }: { overview: TrainingOverview }) {
 }
 
 function BodyweightSection({ bodyweight }: { bodyweight: BodyweightChart }) {
-  const links = chartRanges.map((range) => ({
-    key: range,
-    text: fitnessStrings.progress.ranges[range],
-    href: `/fitness-tracker?range=${range}`,
-    isSelected: range === bodyweight.range,
-  }));
+  const rangeFilter = {
+    label: fitnessStrings.progress.rangeLabel,
+    value: bodyweight.range,
+    options: chartRanges.map((range) => ({
+      value: range,
+      text: fitnessStrings.progress.ranges[range],
+      href: `/fitness-tracker?range=${range}`,
+    })),
+  };
   return (
     <section className={styles.bodyweight}>
       <h2 className={styles.sectionHeading}>{fitnessStrings.progress.bodyweight.heading}</h2>
-      <FilterLinks label={fitnessStrings.progress.rangeLabel} links={links} />
+      <ChartFilters filters={[rangeFilter]} />
       {bodyweight.points.length === 0 ? (
         <p className={styles.emptyText}>{fitnessStrings.progress.bodyweight.empty}</p>
       ) : (

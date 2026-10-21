@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { ActionButton } from '@/features/fitness-tracker/components/ActionButton';
 import { BodyPartEditor } from '@/features/fitness-tracker/components/BodyPartEditor';
 import { DeleteExerciseButton } from '@/features/fitness-tracker/components/DeleteExerciseButton';
-import { FilterLinks } from '@/features/fitness-tracker/components/FilterLinks';
+import { type ChartFilter, ChartFilters } from '@/features/fitness-tracker/components/ChartFilters';
 import { ProgramLegend } from '@/features/fitness-tracker/components/ProgramLegend';
 import { ProgressLineChart } from '@/features/fitness-tracker/components/ProgressLineChart';
 import { VariantEditor } from '@/features/fitness-tracker/components/VariantEditor';
@@ -35,28 +35,32 @@ function chartHref(exerciseId: string, range: ChartRange, variant: string | null
 
 function OneRepMaxSection({ exerciseId, chart }: { exerciseId: string; chart: OneRepMaxChart }) {
   const progress = fitnessStrings.progress;
-  const rangeLinks = chartRanges.map((range) => ({
-    key: range,
-    text: progress.ranges[range],
-    href: chartHref(exerciseId, range, chart.selectedParam),
-    isSelected: range === chart.range,
-  }));
-  const variantLinks = chart.chips.map((chip) => ({
-    key: chip.param,
-    text: chip.variantName ?? progress.noVariant,
-    href: chartHref(exerciseId, chart.range, chip.param),
-    isSelected: chip.isSelected,
-  }));
+  const rangeFilter: ChartFilter = {
+    label: progress.rangeLabel,
+    value: chart.range,
+    options: chartRanges.map((range) => ({
+      value: range,
+      text: progress.ranges[range],
+      href: chartHref(exerciseId, range, chart.selectedParam),
+    })),
+  };
+  const variantFilter: ChartFilter = {
+    label: progress.variantLabel,
+    value: chart.selectedParam ?? '',
+    options: chart.chips.map((chip) => ({
+      value: chip.param,
+      text: chip.variantName ?? progress.noVariant,
+      href: chartHref(exerciseId, chart.range, chip.param),
+    })),
+  };
+  const filters = chart.chips.length === 0 ? [rangeFilter] : [rangeFilter, variantFilter];
   return (
     <section className={styles.section} aria-labelledby={oneRepMaxHeadingId}>
       <h2 id={oneRepMaxHeadingId} className={styles.heading}>
         {progress.oneRepMax.heading}
       </h2>
       <p className={styles.note}>{progress.oneRepMax.note}</p>
-      <FilterLinks label={progress.rangeLabel} links={rangeLinks} />
-      {variantLinks.length === 0 ? null : (
-        <FilterLinks label={progress.variantLabel} links={variantLinks} />
-      )}
+      <ChartFilters filters={filters} />
       {chart.points.length === 0 ? (
         <p className={styles.empty}>{progress.oneRepMax.empty}</p>
       ) : (
