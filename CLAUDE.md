@@ -83,8 +83,7 @@ into `main` runs `.github/workflows/check.yml`, the same gate with the storage t
 D1, and a red check blocks the merge.
 
 Not built yet: views of past passes, workouts and sessions, `src/components/`, and end-to-end tests
-in CI. Those are created when they have a real occupant, not
-before.
+in CI. Those are created when they have a real occupant, not before.
 
 ## Commands
 

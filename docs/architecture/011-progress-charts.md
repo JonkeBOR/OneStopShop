@@ -60,5 +60,6 @@ run and stays far inside the limit.
   including tombstones, and must expect ids with no row.
 - The `programs` table grows by one row per deleted program, which is small for one user.
 - A new chart reuses `ProgressLineChart` and colours itself through tokens and classes. Recharts
-  renders at zero size in jsdom, so component tests stub `ResizeObserver` and only check that the
-  figure renders; the chart itself is seen in Playwright.
+  measures no size in jsdom, so `ProgressLineChart` passes `initialDimension` to give it a size to
+  render at; component tests stub `ResizeObserver` and only check that the figure renders, and the
+  chart itself is seen in Playwright.

@@ -259,10 +259,27 @@ export function oneRepMaxChart(input: OneRepMaxChartInput): OneRepMaxChart {
   };
 }
 
+const MAX_YEARLESS_TICK_SPAN_MS = 366 * DAY_MS;
+
 export function formatChartDate(time: number): string {
   return new Intl.DateTimeFormat('en-GB', {
     timeZone: 'UTC',
     day: 'numeric',
     month: 'short',
   }).format(time);
+}
+
+export function formatChartDateWithYear(time: number): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'UTC',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(time);
+}
+
+export function tickFormatterFor(domain: ChartDomain): (time: number) => string {
+  return domain[1] - domain[0] > MAX_YEARLESS_TICK_SPAN_MS
+    ? formatChartDateWithYear
+    : formatChartDate;
 }

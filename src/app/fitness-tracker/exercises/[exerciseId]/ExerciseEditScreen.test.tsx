@@ -302,6 +302,7 @@ describe('ExerciseEditScreen', () => {
       expect(muscle('Name of lats').getAttribute('aria-checked')).toBe('false');
     });
   });
+
   describe('estimated 1RM chart', () => {
     const progress = fitnessStrings.progress;
 

@@ -5,10 +5,12 @@ import {
   dayStart,
   estimatedOneRepMaxKg,
   formatChartDate,
+  formatChartDateWithYear,
   localDay,
   oneRepMaxChart,
   parseChartRange,
   rangeStartDate,
+  tickFormatterFor,
 } from './progress-chart';
 import type { ProgramSession } from './progress-chart';
 import type { SetLog } from './types';
@@ -51,6 +53,22 @@ describe('time axis', () => {
 
   it('formats a chart time as a short date', () => {
     expect(formatChartDate(chartTime('2026-10-21'))).toBe('21 Oct');
+  });
+
+  it('formats a chart time with its year for the tooltip', () => {
+    expect(formatChartDateWithYear(chartTime('2026-10-21'))).toBe('21 Oct 2026');
+  });
+
+  it('leaves the year off ticks for a domain of a year or less', () => {
+    const threeMonths = bodyweightChart([], '2026-10-21', '3m').domain;
+    const oneYear = bodyweightChart([], '2026-10-21', '1y').domain;
+    expect(tickFormatterFor(threeMonths)(chartTime('2026-10-21'))).toBe('21 Oct');
+    expect(tickFormatterFor(oneYear)(chartTime('2026-10-21'))).toBe('21 Oct');
+  });
+
+  it('puts the year on ticks for a domain longer than 366 days', () => {
+    const domain: [number, number] = [dayStart('2024-01-01'), dayStart('2026-10-21') + DAY];
+    expect(tickFormatterFor(domain)(chartTime('2025-03-05'))).toBe('5 Mar 2025');
   });
 });
 
@@ -214,6 +232,17 @@ describe('oneRepMaxChart', () => {
     expect(none.chips).toEqual([]);
     expect(none.selectedParam).toBeNull();
     expect(none.points).toEqual([]);
+  });
+
+  it('gives one point per variant series for a session that used two variants', () => {
+    const logs = [
+      setLog({ day: '2026-10-01', reps: 5, weightKg: 80, variantId: 'a', sessionId: 's' }),
+      setLog({ day: '2026-10-01', reps: 5, weightKg: 90, variantId: 'b', sessionId: 's' }),
+    ];
+    const first = chartFor(logs, { requestedVariant: 'a' });
+    expect(first.chips.map((chip) => chip.param).toSorted()).toEqual(['a', 'b']);
+    expect(first.points).toHaveLength(1);
+    expect(chartFor(logs, { requestedVariant: 'b' }).points).toHaveLength(1);
   });
 
   it('drops a series whose variant is unknown', () => {

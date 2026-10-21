@@ -65,20 +65,23 @@ describe('reading program sessions and variants for progress charts', () => {
 
   it('listProgramSessions returns sessions in start order with program names', async () => {
     const { db } = testDatabase;
-    const first = await activate(profileId, 'First program');
-    const firstSession = await logWorkout(profileId, first.workouts[0]?.id ?? '');
-    const second = await activate(profileId, 'Second program');
-    const secondSession = await logWorkout(profileId, second.workouts[0]?.id ?? '');
+    const laterStart = clock + 86_400_000;
+    const earlierStart = clock + 3_600_000;
+    const insertedFirst = await activate(profileId, 'Inserted first');
+    clock = laterStart;
+    await logWorkout(profileId, insertedFirst.workouts[0]?.id ?? '');
+    const insertedSecond = await activate(profileId, 'Inserted second');
+    clock = earlierStart;
+    await logWorkout(profileId, insertedSecond.workouts[0]?.id ?? '');
 
     const sessions = await listProgramSessions(db, profileId);
 
     expect(sessions.map((session) => [session.programId, session.programName])).toEqual([
-      [first.id, 'First program'],
-      [second.id, 'Second program'],
+      [insertedSecond.id, 'Inserted second'],
+      [insertedFirst.id, 'Inserted first'],
     ]);
     expect(sessions.every((session) => !session.isDeleted)).toBe(true);
     expect(sessions[0]?.startedAt.getTime()).toBeLessThan(sessions[1]?.startedAt.getTime() ?? 0);
-    expect(firstSession.id).not.toBe(secondSession.id);
   });
 
   it("listProgramSessions marks a soft-deleted program's sessions as deleted and keeps its name", async () => {

@@ -15,8 +15,9 @@ import { fitnessStrings } from '@/lib/strings/fitness';
 import {
   type ChartDomain,
   type ChartPoint,
-  formatChartDate,
+  formatChartDateWithYear,
   type ProgramBand,
+  tickFormatterFor,
 } from '../domain/progress-chart';
 import { formatKg } from '../domain/values';
 import styles from './ProgressLineChart.module.css';
@@ -41,7 +42,7 @@ function ChartTooltip({ active, label, payload }: TooltipContentProps) {
   }
   return (
     <p className={styles.tooltip}>
-      {fitnessStrings.progress.tooltip(formatChartDate(label), formatKg(kg))}
+      {fitnessStrings.progress.tooltip(formatChartDateWithYear(label), formatKg(kg))}
     </p>
   );
 }
@@ -69,7 +70,7 @@ export function ProgressLineChart({ label, points, domain, bands = [] }: Progres
             type="number"
             scale="time"
             domain={domain}
-            tickFormatter={formatChartDate}
+            tickFormatter={tickFormatterFor(domain)}
             className={styles.axis}
             tickLine={false}
           />
