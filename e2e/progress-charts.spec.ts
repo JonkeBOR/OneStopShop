@@ -8,7 +8,7 @@ async function openExercise(page: Page, exerciseName: string) {
   await expect(page.getByRole('heading', { level: 1, name: exerciseName })).toBeVisible();
 }
 
-test('the home screen charts bodyweight and the exercise page charts estimated 1RM by program', async ({
+test('the home screen charts bodyweight and the exercise page charts the heaviest set by program, or estimated 1RM', async ({
   page,
   context,
 }) => {
@@ -19,7 +19,7 @@ test('the home screen charts bodyweight and the exercise page charts estimated 1
   const exerciseName = `Bench ${run}`;
   const progress = fitnessStrings.progress;
   const bodyweightChart = page.getByRole('figure', { name: progress.bodyweight.chartLabel });
-  const oneRepMaxChart = page.getByRole('figure', { name: progress.oneRepMax.chartLabel });
+  const heaviestChart = page.getByRole('figure', { name: progress.metrics.heaviest.chartLabel });
   const legend = page.getByRole('list', { name: progress.legendLabel });
   await signIn(context);
 
@@ -50,7 +50,7 @@ test('the home screen charts bodyweight and the exercise page charts estimated 1
     .selectOption({ label: fitnessStrings.workoutEdit.newExerciseOption });
   await page.getByLabel(fitnessStrings.workoutEdit.newExerciseNameLabel).fill(exerciseName);
   await page.getByLabel(fitnessStrings.workoutEdit.setsLabel, { exact: true }).fill('1');
-  await page.getByLabel(fitnessStrings.workoutEdit.repsLabel, { exact: true }).fill('12');
+  await page.getByLabel(fitnessStrings.workoutEdit.repsLabel, { exact: true }).fill('15');
   await page.getByRole('button', { name: fitnessStrings.workoutEdit.save }).click();
   await expect(page.getByRole('heading', { level: 1, name: workoutName })).toBeVisible();
 
@@ -73,7 +73,7 @@ test('the home screen charts bodyweight and the exercise page charts estimated 1
   await expect(page).toHaveURL(/\/finished/);
 
   await openExercise(page, exerciseName);
-  await expect(oneRepMaxChart).toBeVisible();
+  await expect(heaviestChart).toBeVisible();
   await expect(legend).toContainText(programName);
 
   await page.goto(programUrl);
@@ -96,5 +96,13 @@ test('the home screen charts bodyweight and the exercise page charts estimated 1
     .getByRole('combobox', { name: progress.rangeLabel })
     .selectOption({ label: progress.ranges.all });
   await expect(page).toHaveURL(/range=all/);
-  await expect(oneRepMaxChart).toBeVisible();
+  await expect(heaviestChart).toBeVisible();
+
+  await page
+    .getByRole('combobox', { name: progress.metricLabel })
+    .selectOption({ label: progress.metrics['1rm'].option });
+  await expect(page).toHaveURL(/metric=1rm/);
+  await expect(page).toHaveURL(/range=all/);
+  await expect(page.getByText(progress.metrics['1rm'].empty)).toBeVisible();
+  await expect(page.getByText(progress.metrics['1rm'].note)).toBeVisible();
 });

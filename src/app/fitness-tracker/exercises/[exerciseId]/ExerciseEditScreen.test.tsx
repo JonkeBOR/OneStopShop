@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bodyPartIds } from '@/features/fitness-tracker/domain/body-part';
-import type { OneRepMaxChart } from '@/features/fitness-tracker/domain/progress-chart';
+import type { ExerciseChart } from '@/features/fitness-tracker/domain/progress-chart';
 import type { BodyPartView, ExerciseUsage } from '@/features/fitness-tracker/domain/types';
 import { fitnessErrorStrings, fitnessStrings } from '@/lib/strings/fitness';
 import { ExerciseEditScreen } from './ExerciseEditScreen';
@@ -23,7 +23,8 @@ vi.mock('@/features/fitness-tracker/components/ProgressLineChart', () => ({
   ProgressLineChart: ({ label }: { label: string }) => <figure aria-label={label} />,
 }));
 
-const emptyOneRepMax: OneRepMaxChart = {
+const emptyChart: ExerciseChart = {
+  metric: 'heaviest',
   range: '3m',
   domain: [0, 1],
   chips: [],
@@ -33,8 +34,9 @@ const emptyOneRepMax: OneRepMaxChart = {
   legend: [],
 };
 
-function oneRepMax(overrides: Partial<OneRepMaxChart> = {}): OneRepMaxChart {
+function chartWith(overrides: Partial<ExerciseChart> = {}): ExerciseChart {
   return {
+    metric: 'heaviest',
     range: '3m',
     domain: [0, 2],
     chips: [],
@@ -51,10 +53,10 @@ function oneRepMax(overrides: Partial<OneRepMaxChart> = {}): OneRepMaxChart {
 
 function renderScreen(
   usageOverrides: Partial<ExerciseUsage> = {},
-  chart: OneRepMaxChart = emptyOneRepMax,
+  chart: ExerciseChart = emptyChart,
 ) {
   return render(
-    <ExerciseEditScreen bodyParts={bodyParts} usage={usage(usageOverrides)} oneRepMax={chart} />,
+    <ExerciseEditScreen bodyParts={bodyParts} usage={usage(usageOverrides)} chart={chart} />,
   );
 }
 
@@ -303,13 +305,13 @@ describe('ExerciseEditScreen', () => {
     });
   });
 
-  describe('estimated 1RM chart', () => {
+  describe('progress chart', () => {
     const progress = fitnessStrings.progress;
 
-    it('shows the estimated 1RM chart as the first section, above the muscles', () => {
-      renderScreen({}, oneRepMax());
+    it('shows the heaviest weight chart as the first section, above the muscles', () => {
+      renderScreen({}, chartWith());
 
-      const figure = screen.getByRole('figure', { name: progress.oneRepMax.chartLabel });
+      const figure = screen.getByRole('figure', { name: progress.metrics.heaviest.chartLabel });
       const muscles = screen.getByRole('heading', {
         level: 2,
         name: fitnessStrings.exerciseEdit.musclesHeading,
@@ -317,18 +319,66 @@ describe('ExerciseEditScreen', () => {
       expect(
         figure.compareDocumentPosition(muscles) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
+      expect(screen.getByRole('heading', { level: 2, name: progress.heading })).toBeDefined();
+      expect(screen.queryByText(progress.metrics['1rm'].note)).toBeNull();
+    });
+
+    it('shows the estimated 1RM chart with its note', () => {
+      renderScreen({}, chartWith({ metric: '1rm' }));
+
       expect(
-        screen.getByRole('heading', { level: 2, name: progress.oneRepMax.heading }),
+        screen.getByRole('figure', { name: progress.metrics['1rm'].chartLabel }),
       ).toBeDefined();
-      expect(screen.getByText(progress.oneRepMax.note)).toBeDefined();
+      expect(screen.getByText(progress.metrics['1rm'].note)).toBeDefined();
     });
 
     function choose(label: string, value: string) {
       fireEvent.change(screen.getByRole('combobox', { name: label }), { target: { value } });
     }
 
+    it('puts measure, range and variant on one row, in that order', () => {
+      renderScreen(
+        {},
+        chartWith({
+          selectedParam: 'v1',
+          chips: [
+            { param: 'v1', variantName: 'Gym A', isSelected: true },
+            { param: 'none', variantName: null, isSelected: false },
+          ],
+        }),
+      );
+
+      const metric = screen.getByRole('combobox', { name: progress.metricLabel });
+      const row = metric.parentElement?.parentElement;
+      expect(
+        within(row as HTMLElement)
+          .getAllByRole('combobox')
+          .map((select) => select.getAttribute('aria-label')),
+      ).toEqual([progress.metricLabel, progress.rangeLabel, progress.variantLabel]);
+    });
+
+    it('switches measure from a dropdown and keeps the range and variant', () => {
+      renderScreen({}, chartWith({ range: '1y', selectedParam: 'v1' }));
+
+      const metric = screen.getByRole<HTMLSelectElement>('combobox', {
+        name: progress.metricLabel,
+      });
+      expect(metric.value).toBe('heaviest');
+      expect(
+        within(metric)
+          .getAllByRole('option')
+          .map((option) => option.textContent),
+      ).toEqual([progress.metrics.heaviest.option, progress.metrics['1rm'].option]);
+      choose(progress.metricLabel, '1rm');
+
+      expect(router.push).toHaveBeenCalledWith(
+        '/fitness-tracker/exercises/e1?metric=1rm&range=1y&variant=v1',
+        { scroll: false },
+      );
+    });
+
     it('switches range from a dropdown and keeps the selected variant', () => {
-      renderScreen({}, oneRepMax({ selectedParam: 'v1' }));
+      renderScreen({}, chartWith({ selectedParam: 'v1' }));
 
       expect(
         screen.getByRole<HTMLSelectElement>('combobox', { name: progress.rangeLabel }).value,
@@ -336,25 +386,28 @@ describe('ExerciseEditScreen', () => {
       choose(progress.rangeLabel, '1y');
 
       expect(router.push).toHaveBeenCalledWith(
-        '/fitness-tracker/exercises/e1?range=1y&variant=v1',
+        '/fitness-tracker/exercises/e1?metric=heaviest&range=1y&variant=v1',
         { scroll: false },
       );
     });
 
     it('switches range without a variant when no series is selected', () => {
-      renderScreen({}, emptyOneRepMax);
+      renderScreen({}, emptyChart);
 
       choose(progress.rangeLabel, 'all');
 
-      expect(router.push).toHaveBeenCalledWith('/fitness-tracker/exercises/e1?range=all', {
-        scroll: false,
-      });
+      expect(router.push).toHaveBeenCalledWith(
+        '/fitness-tracker/exercises/e1?metric=heaviest&range=all',
+        {
+          scroll: false,
+        },
+      );
     });
 
     it('shows a variant dropdown beside the range only when there are several series, with "No variant" for the null series', () => {
       renderScreen(
         {},
-        oneRepMax({
+        chartWith({
           selectedParam: 'v1',
           chips: [
             { param: 'v1', variantName: 'Gym A', isSelected: true },
@@ -375,13 +428,13 @@ describe('ExerciseEditScreen', () => {
       choose(progress.variantLabel, 'none');
 
       expect(router.push).toHaveBeenCalledWith(
-        '/fitness-tracker/exercises/e1?range=3m&variant=none',
+        '/fitness-tracker/exercises/e1?metric=heaviest&range=3m&variant=none',
         { scroll: false },
       );
     });
 
     it('shows no variant dropdown for a single series', () => {
-      renderScreen({}, oneRepMax());
+      renderScreen({}, chartWith());
 
       expect(screen.queryByRole('combobox', { name: progress.variantLabel })).toBeNull();
     });
@@ -389,7 +442,7 @@ describe('ExerciseEditScreen', () => {
     it('shows the program legend with deleted programs marked', () => {
       renderScreen(
         {},
-        oneRepMax({
+        chartWith({
           legend: [
             { programId: 'p1', name: 'PPL', isDeleted: true, colorIndex: 0 },
             { programId: 'p2', name: 'Strength', isDeleted: false, colorIndex: 1 },
@@ -405,17 +458,18 @@ describe('ExerciseEditScreen', () => {
       ).toEqual([progress.deletedProgram('PPL'), 'Strength']);
     });
 
-    it('shows the 1RM empty state when nothing qualifies', () => {
+    it('shows the empty state of the selected measure when nothing qualifies', () => {
       renderScreen(
         {},
-        oneRepMax({
+        chartWith({
+          metric: '1rm',
           selectedParam: null,
           points: [],
           legend: [{ programId: 'p1', name: 'PPL', isDeleted: false, colorIndex: 0 }],
         }),
       );
 
-      expect(screen.getByText(progress.oneRepMax.empty)).toBeDefined();
+      expect(screen.getByText(progress.metrics['1rm'].empty)).toBeDefined();
       expect(screen.queryByRole('figure')).toBeNull();
       expect(screen.queryByRole('list', { name: progress.legendLabel })).toBeNull();
     });

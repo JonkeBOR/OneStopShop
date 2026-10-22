@@ -66,6 +66,10 @@ export function bodyweightChart(
   };
 }
 
+export const exerciseMetrics = ['heaviest', '1rm'] as const;
+
+export type ExerciseMetric = (typeof exerciseMetrics)[number];
+
 export const noVariantParam = 'none';
 
 export const programBandColorCount = 4;
@@ -98,7 +102,8 @@ export type LegendEntry = {
 
 export type SeriesChip = { param: string; variantName: string | null; isSelected: boolean };
 
-export type OneRepMaxChart = {
+export type ExerciseChart = {
+  metric: ExerciseMetric;
   range: ChartRange;
   domain: ChartDomain;
   chips: SeriesChip[];
@@ -108,7 +113,8 @@ export type OneRepMaxChart = {
   legend: LegendEntry[];
 };
 
-type OneRepMaxChartInput = {
+type ExerciseChartInput = {
+  metric: ExerciseMetric;
   setLogs: readonly SetLog[];
   variants: readonly ExerciseVariant[];
   sessions: readonly ProgramSession[];
@@ -119,6 +125,10 @@ type OneRepMaxChartInput = {
 };
 
 type Series = { param: string; points: ChartPoint[] };
+
+export function parseExerciseMetric(value: string | undefined): ExerciseMetric {
+  return exerciseMetrics.find((metric) => metric === value) ?? 'heaviest';
+}
 
 export function estimatedOneRepMaxKg(reps: number, weightKg: number | null): number | null {
   if (weightKg === null || reps < 1 || reps > MAX_ESTIMATE_REPS) {
@@ -131,14 +141,19 @@ export function variantParam(variantId: string | null): string {
   return variantId ?? noVariantParam;
 }
 
+function metricKg(metric: ExerciseMetric, log: SetLog): number | null {
+  return metric === '1rm' ? estimatedOneRepMaxKg(log.reps, log.weightKg) : log.weightKg;
+}
+
 function seriesFromLogs(
   setLogs: readonly SetLog[],
+  metric: ExerciseMetric,
   timeZone: string,
   start: string | null,
 ): Series[] {
   const bestBySession = new Map<string, Map<string, { kg: number; day: string }>>();
   for (const log of setLogs) {
-    const kg = estimatedOneRepMaxKg(log.reps, log.weightKg);
+    const kg = metricKg(metric, log);
     if (kg === null) {
       continue;
     }
@@ -240,11 +255,11 @@ function allTimeDomain(
   ];
 }
 
-export function oneRepMaxChart(input: OneRepMaxChartInput): OneRepMaxChart {
-  const { today, timeZone, range } = input;
+export function exerciseChart(input: ExerciseChartInput): ExerciseChart {
+  const { metric, today, timeZone, range } = input;
   const start = rangeStartDate(today, range);
   const variantNames = new Map(input.variants.map((variant) => [variant.id, variant.name]));
-  const series = seriesFromLogs(input.setLogs, timeZone, start)
+  const series = seriesFromLogs(input.setLogs, metric, timeZone, start)
     .filter((candidate) => candidate.param === noVariantParam || variantNames.has(candidate.param))
     .toSorted((a, b) => lastTime(b) - lastTime(a));
   const selected =
@@ -252,6 +267,7 @@ export function oneRepMaxChart(input: OneRepMaxChartInput): OneRepMaxChart {
   const points = selected?.points ?? [];
   const bands = programBands(input.sessions, timeZone, start);
   return {
+    metric,
     range,
     domain:
       start === null

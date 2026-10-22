@@ -11,7 +11,9 @@ import { Screen } from '@/features/fitness-tracker/components/Screen';
 import {
   type ChartRange,
   chartRanges,
-  type OneRepMaxChart,
+  type ExerciseChart,
+  type ExerciseMetric,
+  exerciseMetrics,
 } from '@/features/fitness-tracker/domain/progress-chart';
 import type { BodyPartView, ExerciseUsage } from '@/features/fitness-tracker/domain/types';
 import { fitnessStrings } from '@/lib/strings/fitness';
@@ -20,28 +22,43 @@ import styles from './ExerciseEditScreen.module.css';
 type ExerciseEditScreenProps = {
   usage: ExerciseUsage;
   bodyParts: readonly BodyPartView[];
-  oneRepMax: OneRepMaxChart;
+  chart: ExerciseChart;
 };
 
 const usedInHeadingId = 'exercise-used-in-heading';
 const musclesHeadingId = 'exercise-muscles-heading';
 const variantsHeadingId = 'exercise-variants-heading';
-const oneRepMaxHeadingId = 'exercise-one-rep-max-heading';
+const progressHeadingId = 'exercise-progress-heading';
 
-function chartHref(exerciseId: string, range: ChartRange, variant: string | null): string {
-  const path = `/fitness-tracker/exercises/${exerciseId}?range=${range}`;
+function chartHref(
+  exerciseId: string,
+  metric: ExerciseMetric,
+  range: ChartRange,
+  variant: string | null,
+): string {
+  const path = `/fitness-tracker/exercises/${exerciseId}?metric=${metric}&range=${range}`;
   return variant === null ? path : `${path}&variant=${variant}`;
 }
 
-function OneRepMaxSection({ exerciseId, chart }: { exerciseId: string; chart: OneRepMaxChart }) {
+function ProgressSection({ exerciseId, chart }: { exerciseId: string; chart: ExerciseChart }) {
   const progress = fitnessStrings.progress;
+  const metricText = progress.metrics[chart.metric];
+  const metricFilter: ChartFilter = {
+    label: progress.metricLabel,
+    value: chart.metric,
+    options: exerciseMetrics.map((metric) => ({
+      value: metric,
+      text: progress.metrics[metric].option,
+      href: chartHref(exerciseId, metric, chart.range, chart.selectedParam),
+    })),
+  };
   const rangeFilter: ChartFilter = {
     label: progress.rangeLabel,
     value: chart.range,
     options: chartRanges.map((range) => ({
       value: range,
       text: progress.ranges[range],
-      href: chartHref(exerciseId, range, chart.selectedParam),
+      href: chartHref(exerciseId, chart.metric, range, chart.selectedParam),
     })),
   };
   const variantFilter: ChartFilter = {
@@ -50,23 +67,26 @@ function OneRepMaxSection({ exerciseId, chart }: { exerciseId: string; chart: On
     options: chart.chips.map((chip) => ({
       value: chip.param,
       text: chip.variantName ?? progress.noVariant,
-      href: chartHref(exerciseId, chart.range, chip.param),
+      href: chartHref(exerciseId, chart.metric, chart.range, chip.param),
     })),
   };
-  const filters = chart.chips.length === 0 ? [rangeFilter] : [rangeFilter, variantFilter];
+  const filters =
+    chart.chips.length === 0
+      ? [metricFilter, rangeFilter]
+      : [metricFilter, rangeFilter, variantFilter];
   return (
-    <section className={styles.section} aria-labelledby={oneRepMaxHeadingId}>
-      <h2 id={oneRepMaxHeadingId} className={styles.heading}>
-        {progress.oneRepMax.heading}
+    <section className={styles.section} aria-labelledby={progressHeadingId}>
+      <h2 id={progressHeadingId} className={styles.heading}>
+        {progress.heading}
       </h2>
-      <p className={styles.note}>{progress.oneRepMax.note}</p>
+      {chart.metric === '1rm' && <p className={styles.note}>{progress.metrics['1rm'].note}</p>}
       <ChartFilters filters={filters} />
       {chart.points.length === 0 ? (
-        <p className={styles.empty}>{progress.oneRepMax.empty}</p>
+        <p className={styles.empty}>{metricText.empty}</p>
       ) : (
         <>
           <ProgressLineChart
-            label={progress.oneRepMax.chartLabel}
+            label={metricText.chartLabel}
             points={chart.points}
             domain={chart.domain}
             bands={chart.bands}
@@ -78,7 +98,7 @@ function OneRepMaxSection({ exerciseId, chart }: { exerciseId: string; chart: On
   );
 }
 
-export function ExerciseEditScreen({ usage, bodyParts, oneRepMax }: ExerciseEditScreenProps) {
+export function ExerciseEditScreen({ usage, bodyParts, chart }: ExerciseEditScreenProps) {
   const { exercise, slots, hasSetLogs } = usage;
   const url = `/api/fitness/exercises/${exercise.id}`;
   const canDelete = slots.length === 0 && !hasSetLogs;
@@ -93,7 +113,7 @@ export function ExerciseEditScreen({ usage, bodyParts, oneRepMax }: ExerciseEdit
         currentName={exercise.name}
         url={url}
       />
-      <OneRepMaxSection exerciseId={exercise.id} chart={oneRepMax} />
+      <ProgressSection exerciseId={exercise.id} chart={chart} />
       <section className={styles.section} aria-labelledby={musclesHeadingId}>
         <h2 id={musclesHeadingId} className={styles.heading}>
           {fitnessStrings.exerciseEdit.musclesHeading}

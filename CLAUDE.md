@@ -67,8 +67,8 @@ machine): the slot's selected variant and its weight sit on the planned sets, th
 weights are parked in `planned_set_variant_weights`, and the variant is switched mid-session until a
 set is logged. Deleting a program is a soft delete: its row stays as a tombstone with its name and
 `deleted_at`, its plan is removed, and every program operation treats it as not found. The home
-page has a bodyweight chart and the exercise page an estimated-1RM chart with program bands, built
-with Recharts from `domain/progress-chart.ts`. See
+page has a bodyweight chart and the exercise page a chart with program bands of each session's
+heaviest weight, or of its best estimated 1RM, built with Recharts from `domain/progress-chart.ts`. See
 [006-domain-persistence.md](docs/architecture/006-domain-persistence.md),
 [007-cycle-as-container-and-bff.md](docs/architecture/007-cycle-as-container-and-bff.md),
 [008-weekly-volume-estimate.md](docs/architecture/008-weekly-volume-estimate.md),
