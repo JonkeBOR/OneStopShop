@@ -58,9 +58,10 @@ export function bodyweightChart(
     .filter((entry) => start === null || entry.date >= start)
     .toSorted((a, b) => a.date.localeCompare(b.date));
   const domainStart = start ?? kept[0]?.date ?? today;
+  const domainEnd = start === null ? (kept[kept.length - 1]?.date ?? today) : today;
   return {
     range,
-    domain: [dayStart(domainStart), dayStart(today) + DAY_MS],
+    domain: [dayStart(domainStart), dayStart(domainEnd) + DAY_MS],
     points: kept.map((entry) => ({ time: chartTime(entry.date), kg: entry.weightKg })),
   };
 }
@@ -225,6 +226,20 @@ function legendFromBands(bands: readonly ProgramBand[]): LegendEntry[] {
   return [...legend.values()];
 }
 
+function allTimeDomain(
+  points: readonly ChartPoint[],
+  bands: readonly ProgramBand[],
+  today: string,
+): ChartDomain {
+  if (points.length === 0 && bands.length === 0) {
+    return [dayStart(today), dayStart(today) + DAY_MS];
+  }
+  return [
+    Math.min(...points.map((point) => point.time - HALF_DAY_MS), ...bands.map((band) => band.from)),
+    Math.max(...points.map((point) => point.time + HALF_DAY_MS), ...bands.map((band) => band.to)),
+  ];
+}
+
 export function oneRepMaxChart(input: OneRepMaxChartInput): OneRepMaxChart {
   const { today, timeZone, range } = input;
   const start = rangeStartDate(today, range);
@@ -236,14 +251,12 @@ export function oneRepMaxChart(input: OneRepMaxChartInput): OneRepMaxChart {
     series.find((candidate) => candidate.param === input.requestedVariant) ?? series[0];
   const points = selected?.points ?? [];
   const bands = programBands(input.sessions, timeZone, start);
-  const earliest = Math.min(
-    ...points.map((point) => point.time - HALF_DAY_MS),
-    ...bands.map((band) => band.from),
-  );
-  const domainStart = start === null ? Math.min(earliest, dayStart(today)) : dayStart(start);
   return {
     range,
-    domain: [domainStart, dayStart(today) + DAY_MS],
+    domain:
+      start === null
+        ? allTimeDomain(points, bands, today)
+        : [dayStart(start), dayStart(today) + DAY_MS],
     chips:
       series.length < 2
         ? []
@@ -260,6 +273,7 @@ export function oneRepMaxChart(input: OneRepMaxChartInput): OneRepMaxChart {
 }
 
 const MAX_YEARLESS_TICK_SPAN_MS = 366 * DAY_MS;
+const AXIS_TICK_COUNT = 5;
 
 export function formatChartDate(time: number): string {
   return new Intl.DateTimeFormat('en-GB', {
@@ -282,4 +296,16 @@ export function tickFormatterFor(domain: ChartDomain): (time: number) => string 
   return domain[1] - domain[0] > MAX_YEARLESS_TICK_SPAN_MS
     ? formatChartDateWithYear
     : formatChartDate;
+}
+
+export function axisTicks([from, to]: ChartDomain): number[] {
+  const lastDay = Math.round((to - from) / DAY_MS) - 1;
+  const steps = Math.min(AXIS_TICK_COUNT - 1, lastDay);
+  if (steps < 1) {
+    return [from + HALF_DAY_MS];
+  }
+  return Array.from(
+    { length: steps + 1 },
+    (_, step) => from + HALF_DAY_MS + Math.round((step * lastDay) / steps) * DAY_MS,
+  );
 }
