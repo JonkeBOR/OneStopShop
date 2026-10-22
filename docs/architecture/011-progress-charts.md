@@ -5,8 +5,8 @@
 
 ## Context
 
-Progress charts show bodyweight on the home screen and the estimated one-rep max of an exercise on
-its page, with bands for the programs that were active when the sets were logged. A band needs the
+Progress charts show bodyweight on the home screen and, on an exercise's page, each session's
+heaviest weight or its best estimated one-rep max, with bands for the programs that were active when the sets were logged. A band needs the
 program's name long after the program is gone, but deleting a program removed its row, so the name
 was lost with it.
 
@@ -35,7 +35,7 @@ The charts are drawn with Recharts 3 (`recharts` 3.10.1, with its `react-is` 19 
 chose it. One small Client Component, `ProgressLineChart`, wraps it, because Recharts needs the
 client. It takes points, a time domain and program bands as props that the Server Component has
 already calculated in `domain/progress-chart.ts`, does no maths of its own, and calls no `/api/*`
-route. The range and variant dropdowns (`ChartFilters`) are native `<select>`s that navigate to the
+route. The measure, range and variant dropdowns (`ChartFilters`) are native `<select>`s that navigate to the
 chosen search parameters, so iOS opens its own full-width picker and the server still builds the
 chart. They and the program legend (`ProgramLegend`) are the app's own markup, so their text stays
 in the strings module. Recharts' `Legend` is

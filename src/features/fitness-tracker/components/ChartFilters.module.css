@@ -2,30 +2,33 @@
   display: flex;
   gap: var(--space-2);
   min-width: 0;
+  margin: calc(var(--space-1) * -1);
+  padding: var(--space-1);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.filters::-webkit-scrollbar {
+  display: none;
 }
 
 .field {
   position: relative;
   display: flex;
+  flex-shrink: 0;
   align-items: center;
-  min-width: 0;
-  min-height: var(--tap-target-min);
-  padding: 0 calc(var(--space-3) * 2 + 0.4rem) 0 var(--space-3);
+  padding: var(--space-1) calc(var(--space-2) * 2 + 0.4rem) var(--space-1) var(--space-2);
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text-muted);
-  font-size: var(--font-size-md);
-}
-
-.field:first-child {
-  flex-shrink: 0;
+  font-size: var(--font-size-xs);
 }
 
 .field::after {
   position: absolute;
   top: 50%;
-  right: var(--space-3);
+  right: var(--space-2);
   width: 0.4rem;
   height: 0.4rem;
   border-right: 2px solid currentcolor;

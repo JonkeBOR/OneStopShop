@@ -1,8 +1,9 @@
 import { notFound } from 'next/navigation';
 import {
+  exerciseChart,
   localDay,
-  oneRepMaxChart,
   parseChartRange,
+  parseExerciseMetric,
 } from '@/features/fitness-tracker/domain/progress-chart';
 import { listBodyParts } from '@/features/fitness-tracker/server/body-parts';
 import { getExerciseUsage } from '@/features/fitness-tracker/server/exercises';
@@ -14,12 +15,12 @@ import { ExerciseEditScreen } from './ExerciseEditScreen';
 
 type ExerciseEditPageProps = {
   params: Promise<{ exerciseId: string }>;
-  searchParams: Promise<{ range?: string; variant?: string }>;
+  searchParams: Promise<{ metric?: string; range?: string; variant?: string }>;
 };
 
 export default async function ExerciseEditPage({ params, searchParams }: ExerciseEditPageProps) {
   const { exerciseId } = await params;
-  const { range, variant } = await searchParams;
+  const { metric, range, variant } = await searchParams;
   const { db, profileId, now } = await requireFitnessContext(
     `/fitness-tracker/exercises/${exerciseId}`,
   );
@@ -38,7 +39,8 @@ export default async function ExerciseEditPage({ params, searchParams }: Exercis
     <ExerciseEditScreen
       usage={usage.value}
       bodyParts={bodyParts}
-      oneRepMax={oneRepMaxChart({
+      chart={exerciseChart({
+        metric: parseExerciseMetric(metric),
         setLogs: history.ok ? history.value.setLogs : [],
         variants,
         sessions,

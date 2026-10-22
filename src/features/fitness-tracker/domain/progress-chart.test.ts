@@ -5,15 +5,16 @@ import {
   chartTime,
   dayStart,
   estimatedOneRepMaxKg,
+  exerciseChart,
   formatChartDate,
   formatChartDateWithYear,
   localDay,
-  oneRepMaxChart,
   parseChartRange,
+  parseExerciseMetric,
   rangeStartDate,
   tickFormatterFor,
 } from './progress-chart';
-import type { ProgramSession } from './progress-chart';
+import type { ExerciseMetric, ProgramSession } from './progress-chart';
 import type { SetLog } from './types';
 
 const DAY = 86_400_000;
@@ -127,6 +128,15 @@ describe('bodyweightChart', () => {
   });
 });
 
+describe('parseExerciseMetric', () => {
+  it('accepts estimated 1RM and defaults to the heaviest weight', () => {
+    expect(parseExerciseMetric('1rm')).toBe('1rm');
+    expect(parseExerciseMetric('heaviest')).toBe('heaviest');
+    expect(parseExerciseMetric(undefined)).toBe('heaviest');
+    expect(parseExerciseMetric('volume')).toBe('heaviest');
+  });
+});
+
 describe('estimatedOneRepMaxKg', () => {
   it('estimates from reps and weight, and rejects what it cannot estimate', () => {
     expect(estimatedOneRepMaxKg(12, 60)).toBe(84);
@@ -174,12 +184,14 @@ function setLog(overrides: {
 function chartFor(
   setLogs: SetLog[],
   extra: {
+    metric?: ExerciseMetric;
     range?: '3m' | '1y' | 'all';
     requestedVariant?: string;
     sessions?: ProgramSession[];
   } = {},
 ) {
-  return oneRepMaxChart({
+  return exerciseChart({
+    metric: extra.metric ?? '1rm',
     setLogs,
     variants: [
       { id: 'a', name: 'Gym A' },
@@ -193,7 +205,7 @@ function chartFor(
   });
 }
 
-describe('oneRepMaxChart', () => {
+describe('exerciseChart estimated 1RM', () => {
   it("picks each session's best estimated set, not its heaviest", () => {
     const chart = chartFor([
       setLog({ day: '2026-10-01', reps: 12, weightKg: 60, sessionId: 's' }),
@@ -278,7 +290,46 @@ describe('oneRepMaxChart', () => {
   });
 });
 
-describe('oneRepMaxChart program bands', () => {
+describe('exerciseChart heaviest weight', () => {
+  it("plots each session's heaviest weight at any reps, as logged", () => {
+    const chart = chartFor(
+      [
+        setLog({ day: '2026-10-01', reps: 15, weightKg: 40, sessionId: 's' }),
+        setLog({ day: '2026-10-01', reps: 20, weightKg: 42.5, sessionId: 's' }),
+        setLog({ day: '2026-10-02', reps: 3, weightKg: 100, sessionId: 't' }),
+        setLog({ day: '2026-10-02', reps: 1, weightKg: 90, sessionId: 't' }),
+      ],
+      { metric: 'heaviest' },
+    );
+    expect(chart.metric).toBe('heaviest');
+    expect(chart.points).toEqual([
+      { time: chartTime('2026-10-01'), kg: 42.5 },
+      { time: chartTime('2026-10-02'), kg: 100 },
+    ]);
+  });
+
+  it('leaves out sets with no weight', () => {
+    const chart = chartFor([setLog({ day: '2026-10-01', reps: 10, weightKg: null })], {
+      metric: 'heaviest',
+    });
+    expect(chart.points).toEqual([]);
+    expect(chart.selectedParam).toBeNull();
+  });
+
+  it('keeps variants apart', () => {
+    const chart = chartFor(
+      [
+        setLog({ day: '2026-10-01', reps: 15, weightKg: 40, variantId: 'a', sessionId: 's' }),
+        setLog({ day: '2026-10-01', reps: 15, weightKg: 50, variantId: 'b', sessionId: 's' }),
+      ],
+      { metric: 'heaviest', requestedVariant: 'a' },
+    );
+    expect(chart.chips.map((chip) => chip.param).toSorted()).toEqual(['a', 'b']);
+    expect(chart.points).toEqual([{ time: chartTime('2026-10-01'), kg: 40 }]);
+  });
+});
+
+describe('exerciseChart program bands', () => {
   const session = (programId: string, day: string): ProgramSession => ({
     programId,
     programName: `Program ${programId}`,
