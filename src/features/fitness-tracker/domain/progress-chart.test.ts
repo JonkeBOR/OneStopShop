@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  axisTicks,
   bodyweightChart,
   chartTime,
   dayStart,
@@ -70,6 +71,28 @@ describe('time axis', () => {
     const domain: [number, number] = [dayStart('2024-01-01'), dayStart('2026-10-21') + DAY];
     expect(tickFormatterFor(domain)(chartTime('2025-03-05'))).toBe('5 Mar 2025');
   });
+
+  it('spreads five ticks evenly over whole days from the range start to today', () => {
+    const domain = bodyweightChart([], '2026-10-21', '3m').domain;
+    expect(axisTicks(domain)).toEqual([
+      chartTime('2026-07-21'),
+      chartTime('2026-08-13'),
+      chartTime('2026-09-05'),
+      chartTime('2026-09-28'),
+      chartTime('2026-10-21'),
+    ]);
+  });
+
+  it('ticks every day of a domain shorter than five days', () => {
+    expect(axisTicks([dayStart('2026-10-21'), dayStart('2026-10-21') + DAY])).toEqual([
+      chartTime('2026-10-21'),
+    ]);
+    expect(axisTicks([dayStart('2026-10-19'), dayStart('2026-10-21') + DAY])).toEqual([
+      chartTime('2026-10-19'),
+      chartTime('2026-10-20'),
+      chartTime('2026-10-21'),
+    ]);
+  });
 });
 
 describe('bodyweightChart', () => {
@@ -89,10 +112,10 @@ describe('bodyweightChart', () => {
     expect(chart.domain).toEqual([dayStart('2026-07-21'), dayStart('2026-10-21') + DAY]);
   });
 
-  it('starts everything at the first entry', () => {
+  it('runs everything from the first entry to the last', () => {
     const chart = bodyweightChart(entries, '2026-10-21', 'all');
     expect(chart.points).toHaveLength(3);
-    expect(chart.domain).toEqual([dayStart('2026-07-20'), dayStart('2026-10-21') + DAY]);
+    expect(chart.domain).toEqual([dayStart('2026-07-20'), dayStart('2026-10-01') + DAY]);
   });
 
   it('starts everything at today when there are no entries', () => {
@@ -309,12 +332,14 @@ describe('oneRepMaxChart program bands', () => {
     expect((band?.to ?? 0) - (band?.from ?? 0)).toBe(DAY);
   });
 
-  it('starts everything at the earliest of the points and the bands', () => {
+  it('runs everything from the earliest to the latest of the points and the bands', () => {
     const chart = chartFor([setLog({ day: '2026-09-15', reps: 5, weightKg: 80 })], {
       range: 'all',
       sessions,
     });
-    expect(chart.domain).toEqual([dayStart('2026-06-01'), dayStart('2026-10-21') + DAY]);
+    expect(chart.domain).toEqual([dayStart('2026-06-01'), dayStart('2026-09-15') + DAY]);
+    const bandsOnly = chartFor([], { range: 'all', sessions });
+    expect(bandsOnly.domain).toEqual([dayStart('2026-06-01'), dayStart('2026-09-01') + DAY]);
     const empty = chartFor([], { range: 'all' });
     expect(empty.domain).toEqual([dayStart('2026-10-21'), dayStart('2026-10-21') + DAY]);
   });

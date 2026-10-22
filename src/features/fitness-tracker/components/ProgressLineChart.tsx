@@ -13,6 +13,7 @@ import {
 } from 'recharts';
 import { fitnessStrings } from '@/lib/strings/fitness';
 import {
+  axisTicks,
   type ChartDomain,
   type ChartPoint,
   formatChartDateWithYear,
@@ -32,6 +33,7 @@ type ProgressLineChartProps = {
 const CHART_HEIGHT = 220;
 const INITIAL_WIDTH = 320;
 const chartMargin = { top: 8, right: 16, bottom: 0, left: 0 };
+const DATE_TICK_MARGIN = 8;
 
 const bandClasses = [styles.band0, styles.band1, styles.band2, styles.band3];
 
@@ -70,9 +72,12 @@ export function ProgressLineChart({ label, points, domain, bands = [] }: Progres
             type="number"
             scale="time"
             domain={domain}
+            ticks={axisTicks(domain)}
+            interval="preserveStartEnd"
             tickFormatter={tickFormatterFor(domain)}
             className={styles.axis}
             tickLine={false}
+            tickMargin={DATE_TICK_MARGIN}
           />
           <YAxis
             domain={['auto', 'auto']}

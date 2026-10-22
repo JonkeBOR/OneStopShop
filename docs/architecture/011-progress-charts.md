@@ -41,6 +41,13 @@ chart. They and the program legend (`ProgramLegend`) are the app's own markup, s
 in the strings module. Recharts' `Legend` is
 not used, because it describes data series rather than reference areas.
 
+The date axis gets explicit `ticks` from `axisTicks`: up to five whole days, evenly spaced, from the
+first day of the domain to the last, with `interval="preserveStartEnd"` dropping middle labels that
+would collide. Without them Recharts treats a line chart's number-typed X axis as categorical and,
+on a `time` scale, puts one tick on every data point, so a few close weigh-ins stack their labels.
+The 3-month and 1-year ranges run from the range start to today; everything runs from the first
+recorded date to the last. The tooltip gives a point's exact date.
+
 Animations are off (`isAnimationActive={false}`): a history chart that draws itself on every visit
 feels slow on the phone. A tooltip with the date and the kg value is the only interaction.
 
