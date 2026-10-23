@@ -85,6 +85,13 @@
       "when": 1792758207099,
       "tag": "0011_default_variants",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1792791307691,
+      "tag": "0012_session_affirmations",
+      "breakpoints": true
     }
   ]
 }
