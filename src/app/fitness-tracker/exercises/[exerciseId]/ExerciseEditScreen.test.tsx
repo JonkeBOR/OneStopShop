@@ -40,7 +40,7 @@ function chartWith(overrides: Partial<ExerciseChart> = {}): ExerciseChart {
     range: '3m',
     domain: [0, 2],
     chips: [],
-    selectedParam: 'none',
+    selectedParam: 'v1',
     points: [
       { time: 0, kg: 100 },
       { time: 1, kg: 102.5 },
@@ -69,7 +69,7 @@ function usage(overrides: Partial<ExerciseUsage> = {}): ExerciseUsage {
     ],
     hasSetLogs: true,
     bodyParts: [{ bodyPart: 'chest', role: 'primary' }],
-    variants: [],
+    variants: [{ id: 'v1', name: 'Default' }],
     ...overrides,
   };
 }
@@ -116,17 +116,24 @@ describe('ExerciseEditScreen', () => {
     const region = screen.getByRole('region', {
       name: fitnessStrings.exerciseEdit.variants.heading,
     });
-    expect(within(region).getByText('Gym A')).toBeDefined();
+    expect(
+      within(region).getByRole('textbox', {
+        name: fitnessStrings.exerciseEdit.variants.renameLabel('Gym A'),
+      }),
+    ).toBeDefined();
   });
 
   it('FR-036: renames the exercise and shows a taken name inline', async () => {
     fetchMock.mockResolvedValue(Response.json({ error: 'name-taken' }, { status: 409 }));
     renderScreen();
 
-    fireEvent.change(screen.getByRole('textbox', { name: fitnessStrings.exerciseEdit.nameLabel }), {
-      target: { value: 'Chins' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: fitnessStrings.common.rename }));
+    const nameInput = screen.getByRole('textbox', { name: fitnessStrings.exerciseEdit.nameLabel });
+    fireEvent.change(nameInput, { target: { value: 'Chins' } });
+    const nameForm = nameInput.closest('form');
+    if (nameForm === null) {
+      throw new Error('The exercise name input is not in a form');
+    }
+    fireEvent.click(within(nameForm).getByRole('button', { name: fitnessStrings.common.rename }));
 
     await waitFor(() =>
       expect(screen.getByRole('alert').textContent).toBe(fitnessErrorStrings['name-taken']),
@@ -342,8 +349,8 @@ describe('ExerciseEditScreen', () => {
         chartWith({
           selectedParam: 'v1',
           chips: [
-            { param: 'v1', variantName: 'Gym A', isSelected: true },
-            { param: 'none', variantName: null, isSelected: false },
+            { param: 'v1', variantName: 'Gym A', isRetired: false, isSelected: true },
+            { param: 'v2', variantName: 'Gym B', isRetired: false, isSelected: false },
           ],
         }),
       );
@@ -404,14 +411,14 @@ describe('ExerciseEditScreen', () => {
       );
     });
 
-    it('shows a variant dropdown beside the range only when there are several series, with "No variant" for the null series', () => {
+    it('shows a variant dropdown beside the range only when there are several series, labelling a retired variant as deleted', () => {
       renderScreen(
         {},
         chartWith({
           selectedParam: 'v1',
           chips: [
-            { param: 'v1', variantName: 'Gym A', isSelected: true },
-            { param: 'none', variantName: null, isSelected: false },
+            { param: 'v1', variantName: 'Gym A', isRetired: false, isSelected: true },
+            { param: 'v2', variantName: 'Gym B', isRetired: true, isSelected: false },
           ],
         }),
       );
@@ -424,11 +431,11 @@ describe('ExerciseEditScreen', () => {
         within(variant)
           .getAllByRole('option')
           .map((option) => option.textContent),
-      ).toEqual(['Gym A', progress.noVariant]);
-      choose(progress.variantLabel, 'none');
+      ).toEqual(['Gym A', progress.retiredVariant('Gym B')]);
+      choose(progress.variantLabel, 'v2');
 
       expect(router.push).toHaveBeenCalledWith(
-        '/fitness-tracker/exercises/e1?metric=heaviest&range=3m&variant=none',
+        '/fitness-tracker/exercises/e1?metric=heaviest&range=3m&variant=v2',
         { scroll: false },
       );
     });

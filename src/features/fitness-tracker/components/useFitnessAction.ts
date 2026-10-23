@@ -12,6 +12,7 @@ const staleViewCodes: readonly FitnessErrorCode[] = [
   'session-not-in-progress',
   'variant-locked',
   'variant-changed',
+  'last-variant',
 ];
 
 export function errorCodeOf(body: unknown): FitnessErrorCode {

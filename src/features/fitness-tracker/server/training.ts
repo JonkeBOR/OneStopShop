@@ -1,24 +1,17 @@
 import 'server-only';
-import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 import type { Database } from '@/lib/server/database';
 import { decideLogSet, prefill } from '../domain/logging';
 import { blockStatuses, decideAfterFinish } from '../domain/progression';
 import { fail, type Result, succeed } from '../domain/result';
 import { decideStartWorkout, suggestedNextWorkout, workoutStatuses } from '../domain/session';
-import type {
-  ExerciseVariant,
-  SessionSlotSettings,
-  SessionView,
-  SetLog,
-  TrainingOverview,
-} from '../domain/types';
-import { chunkIds, isUniqueConstraintViolation, runBatch, type Statement } from './batch';
+import type { SessionSlotSettings, SessionView, SetLog, TrainingOverview } from '../domain/types';
+import { isUniqueConstraintViolation, runBatch, type Statement } from './batch';
 import { startPassStatements } from './cycle-statements';
-import { type BlockRow, type CycleRow, toExercise, toExerciseVariant, toSetLog } from './mapping';
+import { type BlockRow, type CycleRow, toExercise, toSetLog } from './mapping';
 import {
   cycles,
   exerciseSlots,
-  exerciseVariants,
   exercises,
   plannedSets,
   profiles,
@@ -206,19 +199,10 @@ export async function getSession(
       .orderBy(asc(setLogs.performedAt), sql`rowid`),
   ]);
   const logs = logRows.map(toSetLog);
-  const selectedVariantIds = new Set(
-    slotRows.flatMap((slot) => slot.plannedSets[0]?.variantId ?? []),
+  const activeVariants = await listActiveVariants(
+    db,
+    slotRows.map((slot) => slot.exercise.id),
   );
-  const variantsById = new Map<string | null, ExerciseVariant>();
-  for (const chunk of chunkIds([...selectedVariantIds])) {
-    const rows = await db
-      .select()
-      .from(exerciseVariants)
-      .where(inArray(exerciseVariants.id, chunk));
-    for (const row of rows) {
-      variantsById.set(row.id, toExerciseVariant(row));
-    }
-  }
   return succeed({
     id: session.id,
     status: session.status,
@@ -230,14 +214,18 @@ export async function getSession(
       number: block?.position ?? null,
       label: block?.label ?? null,
     },
-    slots: slotRows.map((slot) => ({
-      id: slot.id,
-      exercise: toExercise(slot.exercise),
-      isOptional: slot.isOptional,
-      plannedSets: prefill(slot.plannedSets),
-      loggedSets: logs.filter((log) => log.context.exerciseSlotId === slot.id),
-      variant: variantsById.get(slot.plannedSets[0]?.variantId ?? null) ?? null,
-    })),
+    slots: slotRows.map((slot) => {
+      const variants = activeVariants.get(slot.exercise.id) ?? [];
+      return {
+        id: slot.id,
+        exercise: toExercise(slot.exercise),
+        isOptional: slot.isOptional,
+        plannedSets: prefill(slot.plannedSets),
+        loggedSets: logs.filter((log) => log.context.exerciseSlotId === slot.id),
+        variant: variants.find((entry) => entry.id === slot.plannedSets[0]?.variantId) ?? null,
+        hasVariantChoice: variants.length >= 2,
+      };
+    }),
   });
 }
 

@@ -26,7 +26,7 @@ async function openExercise(page: Page, exerciseName: string) {
   await expect(page.getByRole('heading', { level: 1, name: exerciseName })).toBeVisible();
 }
 
-test('an exercise keeps separate last weights per variant, switchable until a set is logged', async ({
+test('every exercise starts with a default variant that can be renamed, kept, switched and retired', async ({
   page,
   context,
 }) => {
@@ -82,6 +82,8 @@ test('an exercise keeps separate last weights per variant, switchable until a se
   await expect(page.getByText(fitnessStrings.programEdit.active, { exact: true })).toBeVisible();
 
   await openBlockWorkout(page, programName, 1, workoutName);
+  await expect(card.getByText('Default', { exact: true })).toHaveCount(0);
+  await expect(slotOptions).toHaveCount(0);
   await weight.fill('40');
   await logButton.click();
   await expect(page.getByText(fitnessStrings.session.loggedLabel(1))).toBeVisible();
@@ -91,17 +93,25 @@ test('an exercise keeps separate last weights per variant, switchable until a se
   await openExercise(page, exerciseName);
   const variantsRegion = page.getByRole('region', { name: variants.heading });
   await expect(variantsRegion).toBeVisible();
-  await page.getByLabel(variants.nameLabel, { exact: true }).fill('Gym A');
-  await page.getByRole('button', { name: variants.add, exact: true }).click();
-  const firstDialog = page.getByRole('dialog');
-  await expect(firstDialog).toContainText(variants.firstConfirm);
-  await firstDialog.getByRole('button', { name: variants.firstConfirmLabel, exact: true }).click();
-  await expect(variantsRegion).toContainText('Gym A');
+  await expect(variantsRegion).toContainText('Default');
+  await expect(
+    page.getByRole('button', { name: variants.remove('Default'), exact: true }),
+  ).toHaveCount(0);
+  const defaultName = page.getByRole('textbox', { name: variants.renameLabel('Default') });
+  await defaultName.fill('Gym A');
+  await defaultName.blur();
+  await expect(page.getByRole('textbox', { name: variants.renameLabel('Gym A') })).toBeVisible();
   await page.getByLabel(variants.nameLabel, { exact: true }).fill('Gym B');
   await page.getByRole('button', { name: variants.add, exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(variantsRegion).toContainText('Gym A');
   await expect(variantsRegion).toContainText('Gym B');
+  await expect(
+    page.getByRole('button', { name: variants.remove('Gym A'), exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: variants.remove('Gym B'), exact: true }),
+  ).toBeVisible();
 
   await openBlockWorkout(page, programName, 2, workoutName);
   const sessionUrl = page.url();
@@ -138,15 +148,28 @@ test('an exercise keeps separate last weights per variant, switchable until a se
   await expect(page).toHaveURL(/\/finished/);
 
   await openExercise(page, exerciseName);
+  const progressVariant = page.getByRole('combobox', {
+    name: fitnessStrings.progress.variantLabel,
+  });
+  await expect(progressVariant).toBeVisible();
   await page.getByRole('button', { name: variants.remove('Gym B'), exact: true }).click();
   await page
     .getByRole('dialog')
     .getByRole('button', { name: variants.removeConfirmLabel, exact: true })
     .click();
   await expect(variantsRegion).not.toContainText('Gym B');
-  await expect(variantsRegion).toContainText('Gym A');
+  await expect(
+    page.getByRole('button', { name: variants.remove('Gym A'), exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    progressVariant.locator('option', {
+      hasText: fitnessStrings.progress.retiredVariant('Gym B'),
+    }),
+  ).toHaveCount(1);
+  await expect(progressVariant.locator('option', { hasText: 'Gym A' })).toHaveCount(1);
 
   await openBlockWorkout(page, programName, 1, workoutName);
-  await expect(card.getByText('Gym A', { exact: true })).toBeVisible();
+  await expect(card.getByText('Gym A', { exact: true })).toHaveCount(0);
+  await expect(slotOptions).toHaveCount(0);
   await expect(weight).toHaveAttribute('placeholder', '40');
 });

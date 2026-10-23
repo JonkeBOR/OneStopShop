@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { fail, succeed } from './result';
-import { decideVariantSwitch, fallbackVariantId, removalOf } from './variant';
+import { decideVariantRemoval, decideVariantSwitch, fallbackVariantId } from './variant';
 
 const base = {
   sessionStatus: 'in_progress' as const,
@@ -46,9 +46,16 @@ describe('fallbackVariantId', () => {
   });
 });
 
-describe('removalOf', () => {
+describe('decideVariantRemoval', () => {
+  it('refuses to remove the only active variant', () => {
+    expect(
+      decideVariantRemoval({ activeVariantIds: ['a'], variantId: 'a', hasSetLogs: false }),
+    ).toEqual(fail('last-variant'));
+  });
+
   it('retires a variant with logged sets and deletes one without', () => {
-    expect(removalOf(true)).toBe('retire');
-    expect(removalOf(false)).toBe('delete');
+    const input = { activeVariantIds: ['a', 'b'], variantId: 'a' };
+    expect(decideVariantRemoval({ ...input, hasSetLogs: true })).toEqual(succeed('retire'));
+    expect(decideVariantRemoval({ ...input, hasSetLogs: false })).toEqual(succeed('delete'));
   });
 });

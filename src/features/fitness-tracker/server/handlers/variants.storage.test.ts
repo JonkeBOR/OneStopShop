@@ -2,11 +2,16 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { activateProgram } from '../activation';
 import { ensureProfile } from '../profile';
 import { openTestDatabase, type TestDatabase } from '../storage-test-database';
-import { createProgramFromSpec, expectOk } from '../storage-test-support';
+import { createProgramFromSpec, defaultVariantOf, expectOk } from '../storage-test-support';
 import { logSet, startWorkout } from '../training';
 import { addVariant } from '../variants';
 import { handlerContext, jsonOf } from './handler-test-support';
-import { handleAddVariant, handleRemoveVariant, handleSwitchVariant } from './variants';
+import {
+  handleAddVariant,
+  handleRemoveVariant,
+  handleRenameVariant,
+  handleSwitchVariant,
+} from './variants';
 
 describe('variant handlers', () => {
   let testDatabase: TestDatabase;
@@ -75,24 +80,92 @@ describe('variant handlers', () => {
     });
   });
 
-  describe('removing', () => {
-    it('answers how the variant was removed', async () => {
+  describe('renaming', () => {
+    async function twoVariants() {
       const { exerciseId } = await squatProgram();
-      const variant = expectOk(
-        await addVariant(testDatabase.db, profileId, exerciseId, { name: 'Gym A' }, now),
+      await add(exerciseId, { name: 'Gym A' });
+      const gymB = expectOk(
+        await addVariant(
+          testDatabase.db,
+          profileId,
+          exerciseId,
+          { name: 'Gym B' },
+          new Date('2026-10-20T10:01:00Z'),
+        ),
       );
+      return { exerciseId, gymB };
+    }
 
-      const response = await handleRemoveVariant(
+    function rename(exerciseId: string, variantId: string, body: unknown) {
+      return handleRenameVariant(
         handlerContext({
           db: testDatabase.db,
           profileId,
           now,
-          params: { id: exerciseId, variantId: variant.id },
+          body,
+          params: { id: exerciseId, variantId },
         }),
       );
+    }
+
+    it('answers the renamed variant', async () => {
+      const { exerciseId, gymB } = await twoVariants();
+
+      const response = await rename(exerciseId, gymB.id, { name: 'Gym C' });
+
+      expect(response.status).toBe(200);
+      expect(await jsonOf(response)).toMatchObject({ name: 'Gym C' });
+    });
+
+    it('answers 400 invalid-body for a name that is not a string', async () => {
+      const { exerciseId, gymB } = await twoVariants();
+
+      const response = await rename(exerciseId, gymB.id, { name: 3 });
+
+      expect(response.status).toBe(400);
+      expect(await jsonOf(response)).toEqual({ error: 'invalid-body' });
+    });
+  });
+
+  describe('removing', () => {
+    function remove(exerciseId: string, variantId: string) {
+      return handleRemoveVariant(
+        handlerContext({
+          db: testDatabase.db,
+          profileId,
+          now,
+          params: { id: exerciseId, variantId },
+        }),
+      );
+    }
+
+    it('answers how the variant was removed', async () => {
+      const { exerciseId } = await squatProgram();
+      expectOk(await addVariant(testDatabase.db, profileId, exerciseId, { name: 'Gym A' }, now));
+      const gymB = expectOk(
+        await addVariant(
+          testDatabase.db,
+          profileId,
+          exerciseId,
+          { name: 'Gym B' },
+          new Date('2026-10-20T10:01:00Z'),
+        ),
+      );
+
+      const response = await remove(exerciseId, gymB.id);
 
       expect(response.status).toBe(200);
       expect(await jsonOf(response)).toEqual({ removal: 'delete' });
+    });
+
+    it('answers 409 last-variant when removing the only variant', async () => {
+      const { exerciseId } = await squatProgram();
+      const variant = await defaultVariantOf(testDatabase.db, exerciseId);
+
+      const response = await remove(exerciseId, variant.id);
+
+      expect(response.status).toBe(409);
+      expect(await jsonOf(response)).toEqual({ error: 'last-variant' });
     });
   });
 

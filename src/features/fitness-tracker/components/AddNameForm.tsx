@@ -1,7 +1,6 @@
 'use client';
 
 import { type FormEvent, useId, useState } from 'react';
-import { ConfirmDialog } from './ConfirmDialog';
 import { InlineError } from './InlineError';
 import styles from './AddNameForm.module.css';
 import { useFitnessAction } from './useFitnessAction';
@@ -10,10 +9,9 @@ type AddNameFormProps = {
   label: string;
   submitLabel: string;
   url: string;
-  confirm?: { message: string; confirmLabel: string };
 };
 
-export function AddNameForm({ label, submitLabel, url, confirm }: AddNameFormProps) {
+export function AddNameForm({ label, submitLabel, url }: AddNameFormProps) {
   const inputId = useId();
   const [name, setName] = useState('');
   const action = useFitnessAction();
@@ -27,9 +25,7 @@ export function AddNameForm({ label, submitLabel, url, confirm }: AddNameFormPro
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    if (!confirm) {
-      void post();
-    }
+    void post();
   }
 
   return (
@@ -46,20 +42,9 @@ export function AddNameForm({ label, submitLabel, url, confirm }: AddNameFormPro
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
-        {confirm ? (
-          <ConfirmDialog
-            triggerLabel={submitLabel}
-            triggerClassName={styles.submit}
-            message={confirm.message}
-            confirmLabel={confirm.confirmLabel}
-            disabled={action.pending || name.trim() === ''}
-            onConfirm={() => void post()}
-          />
-        ) : (
-          <button type="submit" className={styles.submit} disabled={action.pending}>
-            {submitLabel}
-          </button>
-        )}
+        <button type="submit" className={styles.submit} disabled={action.pending}>
+          {submitLabel}
+        </button>
       </div>
       <InlineError message={action.errorMessage} />
     </form>

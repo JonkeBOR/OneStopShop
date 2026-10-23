@@ -4,7 +4,7 @@ import type { Database } from '@/lib/server/database';
 import { fail, type Result, succeed } from '../domain/result';
 import type { ExerciseVariant } from '../domain/types';
 import { nameKey, parseName } from '../domain/values';
-import { decideVariantSwitch, fallbackVariantId, removalOf } from '../domain/variant';
+import { decideVariantRemoval, decideVariantSwitch, fallbackVariantId } from '../domain/variant';
 import { chunkIds, runBatch, type Statement } from './batch';
 import { toExerciseVariant } from './mapping';
 import {
@@ -76,25 +76,43 @@ export async function addVariant(
     createdAt: now,
     removedAt: null,
   };
-  const statements: Statement[] = [db.insert(exerciseVariants).values(row)];
-  if (active.length === 0) {
-    statements.push(
-      db
-        .update(plannedSets)
-        .set({ variantId: row.id })
-        .where(
-          inArray(
-            plannedSets.exerciseSlotId,
-            db
-              .select({ id: exerciseSlots.id })
-              .from(exerciseSlots)
-              .where(eq(exerciseSlots.exerciseId, exerciseId)),
-          ),
-        ),
-    );
-  }
-  await runBatch(db, statements);
+  await db.insert(exerciseVariants).values(row);
   return succeed(toExerciseVariant(row));
+}
+
+export async function renameVariant(
+  db: Database,
+  profileId: string,
+  exerciseId: string,
+  variantId: string,
+  input: { name: string },
+): Promise<
+  Result<ExerciseVariant, 'name-required' | 'name-too-long' | 'name-taken' | 'not-found'>
+> {
+  const name = parseName(input.name);
+  if (!name.ok) {
+    return fail(name.error);
+  }
+  if (!(await ownsExercise(db, profileId, exerciseId))) {
+    return fail('not-found');
+  }
+  const active = await db
+    .select()
+    .from(exerciseVariants)
+    .where(and(eq(exerciseVariants.exerciseId, exerciseId), isNull(exerciseVariants.removedAt)));
+  const variant = active.find((entry) => entry.id === variantId);
+  if (!variant) {
+    return fail('not-found');
+  }
+  const key = nameKey(name.value);
+  if (active.some((entry) => entry.id !== variantId && entry.nameKey === key)) {
+    return fail('name-taken');
+  }
+  await db
+    .update(exerciseVariants)
+    .set({ name: name.value, nameKey: key })
+    .where(eq(exerciseVariants.id, variantId));
+  return succeed(toExerciseVariant({ ...variant, name: name.value, nameKey: key }));
 }
 
 export async function removeVariant(
@@ -103,7 +121,7 @@ export async function removeVariant(
   exerciseId: string,
   variantId: string,
   now: Date,
-): Promise<Result<{ removal: 'retire' | 'delete' }, 'not-found'>> {
+): Promise<Result<{ removal: 'retire' | 'delete' }, 'not-found' | 'last-variant'>> {
   const [variant] = await db
     .select({ id: exerciseVariants.id })
     .from(exerciseVariants)
@@ -129,7 +147,15 @@ export async function removeVariant(
       .limit(1),
   ]);
   const activeIds = (active.get(exerciseId) ?? []).map((entry) => entry.id);
-  const removal = removalOf(log !== undefined);
+  const decision = decideVariantRemoval({
+    activeVariantIds: activeIds,
+    variantId,
+    hasSetLogs: log !== undefined,
+  });
+  if (!decision.ok) {
+    return fail(decision.error);
+  }
+  const removal = decision.value;
   await runBatch(db, [
     db.delete(plannedSetVariantWeights).where(eq(plannedSetVariantWeights.variantId, variantId)),
     ...swapVariantStatements(

@@ -1,17 +1,20 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { fail } from '../domain/result';
 import type { Program } from '../domain/types';
+import { maxNameLength } from '../domain/values';
 import { activateProgram } from './activation';
 import { runBatch } from './batch';
 import { ensureProfile } from './profile';
 import { exerciseVariants, plannedSets, plannedSetVariantWeights, setLogs } from './schema';
-import { createProgramFromSpec, expectOk } from './storage-test-support';
+import { createProgramFromSpec, defaultVariantOf, expectOk } from './storage-test-support';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
 import { finishWorkout, getSession, logSet, startWorkout } from './training';
 import {
   addVariant,
   listActiveVariants,
   removeVariant,
+  renameVariant,
   swapVariantStatements,
   switchSlotVariant,
 } from './variants';
@@ -135,40 +138,23 @@ describe('exercise variants', () => {
     return row;
   }
 
+  async function renameDefault(exerciseId: string, name: string) {
+    const { db } = testDatabase;
+    const variant = await defaultVariantOf(db, exerciseId);
+    return expectOk(await renameVariant(db, profileId, exerciseId, variant.id, { name }));
+  }
+
   async function activeNames(exerciseId: string): Promise<string[]> {
     const variants = await listActiveVariants(testDatabase.db, [exerciseId]);
     return (variants.get(exerciseId) ?? []).map((variant) => variant.name);
   }
-
-  it('adding the first variant keeps the slot’s last weights and selects it on every planned set of every slot of that exercise', async () => {
-    const { db } = testDatabase;
-    const program = await squatProgram();
-    const squatSets = plannedSetIdsOf(program, 'Squat');
-    const curlSets = plannedSetIdsOf(program, 'Curl');
-    await setWeights(squatSets.slice(0, 2), 40000);
-
-    const variant = expectOk(
-      await addVariant(db, profileId, exerciseIdOf(program, 'Squat'), { name: ' Barbell ' }, now),
-    );
-
-    expect(variant).toEqual({ id: variant.id, name: 'Barbell' });
-    expect(squatSets).toHaveLength(6);
-    const rows = await plannedSetRows(squatSets);
-    expect(rows.every((row) => row.variantId === variant.id)).toBe(true);
-    expect(rows.filter((row) => row.lastWeightGrams === 40000).map((row) => row.id)).toEqual(
-      [...squatSets.slice(0, 2)].sort(),
-    );
-    expect(rows.filter((row) => row.lastWeightGrams === null)).toHaveLength(4);
-    expect((await plannedSetRows(curlSets)).map((row) => row.variantId)).toEqual([null, null]);
-    expect(await parkedRows(squatSets)).toEqual([]);
-  });
 
   it('adding a second variant leaves the selection and weights alone', async () => {
     const { db } = testDatabase;
     const program = await squatProgram();
     const squatId = exerciseIdOf(program, 'Squat');
     const squatSets = plannedSetIdsOf(program, 'Squat');
-    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    const barbell = await renameDefault(squatId, 'Barbell');
     await setWeights(squatSets, 40000);
     const before = await plannedSetRows(squatSets);
 
@@ -184,7 +170,7 @@ describe('exercise variants', () => {
     const { db } = testDatabase;
     const program = await squatProgram();
     const squatId = exerciseIdOf(program, 'Squat');
-    expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    await renameDefault(squatId, 'Barbell');
 
     expect(await addVariant(db, profileId, squatId, { name: '  BARBELL ' }, later)).toEqual({
       ok: false,
@@ -208,14 +194,15 @@ describe('exercise variants', () => {
     const { db } = testDatabase;
     const program = await squatProgram();
     const squatId = exerciseIdOf(program, 'Squat');
-    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    const barbell = await renameDefault(squatId, 'Barbell');
     await logSetWith(program, barbell.id);
+    expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
     expectOk(await removeVariant(db, profileId, squatId, barbell.id, later));
 
     const again = expectOk(await addVariant(db, profileId, squatId, { name: 'barbell' }, latest));
 
     expect(again.id).not.toBe(barbell.id);
-    expect(await activeNames(squatId)).toEqual(['barbell']);
+    expect(await activeNames(squatId)).toEqual(['Smith', 'barbell']);
   });
 
   it('removing a variant with logged sets retires it and hides it from listActiveVariants', async () => {
@@ -223,7 +210,7 @@ describe('exercise variants', () => {
     const program = await squatProgram();
     const squatId = exerciseIdOf(program, 'Squat');
     const squatSets = plannedSetIdsOf(program, 'Squat');
-    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    const barbell = await renameDefault(squatId, 'Barbell');
     const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
     await setWeights(squatSets, 40000);
     await park(squatSets, smith.id, 30000);
@@ -247,7 +234,7 @@ describe('exercise variants', () => {
     const { db } = testDatabase;
     const program = await squatProgram();
     const squatId = exerciseIdOf(program, 'Squat');
-    expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    await renameDefault(squatId, 'Barbell');
     const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
 
     expect(await removeVariant(db, profileId, squatId, smith.id, latest)).toEqual({
@@ -264,7 +251,7 @@ describe('exercise variants', () => {
     const program = await squatProgram();
     const squatId = exerciseIdOf(program, 'Squat');
     const squatSets = plannedSetIdsOf(program, 'Squat');
-    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    const barbell = await renameDefault(squatId, 'Barbell');
     const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
     const goblet = expectOk(await addVariant(db, profileId, squatId, { name: 'Goblet' }, latest));
     await setWeights(squatSets, 40000);
@@ -285,29 +272,83 @@ describe('exercise variants', () => {
     expect(parked).toHaveLength(squatSets.length);
   });
 
-  it('removing the last variant leaves the slot without a variant or weights, and the next add transfers again', async () => {
+  it('refuses to remove the only active variant, even beside a retired one, and changes nothing', async () => {
     const { db } = testDatabase;
     const program = await squatProgram();
     const squatId = exerciseIdOf(program, 'Squat');
     const squatSets = plannedSetIdsOf(program, 'Squat');
-    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
-    await setWeights(squatSets, 40000);
-
+    const barbell = await renameDefault(squatId, 'Barbell');
+    await logSetWith(program, barbell.id);
+    const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
     expectOk(await removeVariant(db, profileId, squatId, barbell.id, later));
 
+    expect(await removeVariant(db, profileId, squatId, smith.id, latest)).toEqual(
+      fail('last-variant'),
+    );
+
+    expect(await activeNames(squatId)).toEqual(['Smith']);
+    expect((await plannedSetRows(squatSets)).every((row) => row.variantId === smith.id)).toBe(true);
+  });
+
+  it('renames a variant and refuses a name another active variant has, ignoring case', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    await renameDefault(squatId, 'Gym A');
+    const gymB = expectOk(await addVariant(db, profileId, squatId, { name: 'Gym B' }, later));
+
+    const renamed = expectOk(
+      await renameVariant(db, profileId, squatId, gymB.id, { name: ' Gym C ' }),
+    );
+
+    expect(renamed).toEqual({ id: gymB.id, name: 'Gym C' });
+    expect(await activeNames(squatId)).toEqual(['Gym A', 'Gym C']);
+    expect(await renameVariant(db, profileId, squatId, gymB.id, { name: 'gym a' })).toEqual(
+      fail('name-taken'),
+    );
+    expect(await activeNames(squatId)).toEqual(['Gym A', 'Gym C']);
+  });
+
+  it('renaming allows a change of case and a retired variant’s name', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    const gymA = await renameDefault(squatId, 'Gym A');
+    const old = expectOk(await addVariant(db, profileId, squatId, { name: 'Old' }, later));
+    await logSetWith(program, old.id);
+    expectOk(await removeVariant(db, profileId, squatId, old.id, later));
+
+    expectOk(await renameVariant(db, profileId, squatId, gymA.id, { name: 'GYM A' }));
+    expect(await activeNames(squatId)).toEqual(['GYM A']);
+    expectOk(await renameVariant(db, profileId, squatId, gymA.id, { name: 'Old' }));
+    expect(await activeNames(squatId)).toEqual(['Old']);
+  });
+
+  it('renaming refuses empty, too long, a retired variant and another profile’s variant', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    const gymA = await renameDefault(squatId, 'Gym A');
+    const old = expectOk(await addVariant(db, profileId, squatId, { name: 'Old' }, later));
+    await logSetWith(program, old.id);
+    expectOk(await removeVariant(db, profileId, squatId, old.id, later));
+    const otherProfileId = (await ensureProfile(db, crypto.randomUUID(), now)).id;
+
+    expect(await renameVariant(db, profileId, squatId, gymA.id, { name: '' })).toEqual(
+      fail('name-required'),
+    );
     expect(
-      (await plannedSetRows(squatSets)).every(
-        (row) => row.variantId === null && row.lastWeightGrams === null,
-      ),
-    ).toBe(true);
-    expect(await activeNames(squatId)).toEqual([]);
-
-    await setWeights(squatSets.slice(0, 1), 50000);
-    const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, latest));
-
-    const rows = await plannedSetRows(squatSets);
-    expect(rows.every((row) => row.variantId === smith.id)).toBe(true);
-    expect(rows.find((row) => row.id === squatSets[0])?.lastWeightGrams).toBe(50000);
+      await renameVariant(db, profileId, squatId, gymA.id, {
+        name: 'x'.repeat(maxNameLength + 1),
+      }),
+    ).toEqual(fail('name-too-long'));
+    expect(await renameVariant(db, profileId, squatId, old.id, { name: 'New' })).toEqual(
+      fail('not-found'),
+    );
+    expect(await renameVariant(db, otherProfileId, squatId, gymA.id, { name: 'New' })).toEqual(
+      fail('not-found'),
+    );
+    expect(await activeNames(squatId)).toEqual(['Gym A']);
   });
 
   it('another profile’s exercise or variant is not-found and nothing changes', async () => {
@@ -316,7 +357,7 @@ describe('exercise variants', () => {
     const squatId = exerciseIdOf(program, 'Squat');
     const curlId = exerciseIdOf(program, 'Curl');
     const squatSets = plannedSetIdsOf(program, 'Squat');
-    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    const barbell = await renameDefault(squatId, 'Barbell');
     const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
     await logSetWith(program, smith.id);
     expectOk(await removeVariant(db, profileId, squatId, smith.id, later));
@@ -358,7 +399,7 @@ describe('exercise variants', () => {
       prescription.plannedSets.map((set) => set.id),
     );
     const otherSets = plannedSetIdsOf(program, 'Squat').filter((id) => !slotSets.includes(id));
-    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    const barbell = await renameDefault(squatId, 'Barbell');
     const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
     await setWeights(slotSets.slice(0, 2), 40000);
     await setWeights(slotSets.slice(2), null);
@@ -409,7 +450,7 @@ describe('exercise variants', () => {
     expectOk(await activateProgram(db, profileId, program.id, now));
     const squatId = exerciseIdOf(program, 'Squat');
     const slotId = slotsOf(program, 'Squat')[0]?.id ?? '';
-    const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
+    const barbell = await renameDefault(squatId, 'Barbell');
     const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
     const session = expectOk(await startWorkout(db, profileId, program.workouts[0]?.id ?? '', now));
     return { program, slotId, barbell, smith, session };

@@ -10,12 +10,6 @@ describe('AddNameForm', () => {
   const fetchMock = vi.fn<typeof fetch>();
 
   beforeEach(() => {
-    HTMLDialogElement.prototype.showModal = function showModal() {
-      this.setAttribute('open', '');
-    };
-    HTMLDialogElement.prototype.close = function close() {
-      this.removeAttribute('open');
-    };
     vi.stubGlobal('fetch', fetchMock);
     fetchMock.mockResolvedValue(Response.json({}));
   });
@@ -26,57 +20,17 @@ describe('AddNameForm', () => {
     router.refresh.mockReset();
   });
 
-  function renderForm(confirm?: { message: string; confirmLabel: string }) {
-    render(<AddNameForm label="Name" submitLabel="Add" url="/api/things" confirm={confirm} />);
+  function renderForm() {
+    render(<AddNameForm label="Name" submitLabel="Add" url="/api/things" />);
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Gym A' } });
   }
 
-  it('posts straight away without a confirmation', async () => {
+  it('posts the name straight away', async () => {
     renderForm();
 
     fireEvent.click(screen.getByRole('button', { name: 'Add' }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/things');
-  });
-
-  it('posts nothing until the confirmation is accepted', async () => {
-    renderForm({ message: 'Sure?', confirmLabel: 'Do it' });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
-
-    expect(screen.getByText('Sure?')).toBeTruthy();
-    expect(fetchMock).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Do it' }));
-
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(JSON.stringify({ name: 'Gym A' }));
-  });
-
-  it('cannot open the confirmation until a name is typed', () => {
-    render(
-      <AddNameForm
-        label="Name"
-        submitLabel="Add"
-        url="/api/things"
-        confirm={{ message: 'Sure?', confirmLabel: 'Do it' }}
-      />,
-    );
-    const trigger = screen.getByRole('button', { name: 'Add' });
-
-    expect(trigger.hasAttribute('disabled')).toBe(true);
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: '   ' } });
-    expect(trigger.hasAttribute('disabled')).toBe(true);
-    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Gym A' } });
-    expect(trigger.hasAttribute('disabled')).toBe(false);
-  });
-
-  it('posts nothing when Enter is pressed in the field before confirming', () => {
-    renderForm({ message: 'Sure?', confirmLabel: 'Do it' });
-
-    fireEvent.submit(screen.getByLabelText('Name'));
-
-    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

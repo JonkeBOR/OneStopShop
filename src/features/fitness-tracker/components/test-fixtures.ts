@@ -101,6 +101,7 @@ export function sessionFixture(overrides: Partial<SessionView> = {}): SessionVie
         ],
         loggedSets: [],
         variant: null,
+        hasVariantChoice: false,
       },
       {
         id: 's2',
@@ -109,6 +110,7 @@ export function sessionFixture(overrides: Partial<SessionView> = {}): SessionVie
         plannedSets: [{ id: 'p4', setNumber: 1, targetReps: 12, suggestedWeightKg: null }],
         loggedSets: [],
         variant: null,
+        hasVariantChoice: false,
       },
     ],
     ...overrides,

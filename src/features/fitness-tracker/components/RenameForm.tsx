@@ -10,23 +10,35 @@ type RenameFormProps = {
   label: string;
   currentName: string;
   url: string;
+  isLabelHidden?: boolean;
+  submitsOnBlur?: boolean;
 };
 
-export function RenameForm({ label, currentName, url }: RenameFormProps) {
+export function RenameForm({
+  label,
+  currentName,
+  url,
+  isLabelHidden = false,
+  submitsOnBlur = false,
+}: RenameFormProps) {
   const inputId = useId();
   const [name, setName] = useState(currentName);
   const action = useFitnessAction();
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  async function save() {
     if (name !== currentName) {
       await action.run('PATCH', url, { name });
     }
   }
 
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    await save();
+  }
+
   return (
     <form className={styles.form} onSubmit={(event) => void submit(event)}>
-      <label className={styles.label} htmlFor={inputId}>
+      <label className={isLabelHidden ? styles.visuallyHidden : styles.label} htmlFor={inputId}>
         {label}
       </label>
       <div className={styles.fields}>
@@ -37,10 +49,13 @@ export function RenameForm({ label, currentName, url }: RenameFormProps) {
           autoComplete="off"
           value={name}
           onChange={(event) => setName(event.target.value)}
+          onBlur={submitsOnBlur ? () => void save() : undefined}
         />
-        <button type="submit" className={styles.submit} disabled={action.pending}>
-          {fitnessStrings.common.rename}
-        </button>
+        {submitsOnBlur ? null : (
+          <button type="submit" className={styles.submit} disabled={action.pending}>
+            {fitnessStrings.common.rename}
+          </button>
+        )}
       </div>
       <InlineError message={action.errorMessage} />
     </form>

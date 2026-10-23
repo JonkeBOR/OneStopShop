@@ -4,10 +4,19 @@ import type { Database } from '@/lib/server/database';
 import { fail, type Result, succeed } from '../domain/result';
 import type { Exercise, ExerciseUsage } from '../domain/types';
 import { nameKey, parseName } from '../domain/values';
-import { isUniqueConstraintViolation } from './batch';
+import { defaultVariantName } from '../domain/variant';
+import { isUniqueConstraintViolation, runBatch } from './batch';
 import { inChartOrder } from './body-parts';
 import { toExercise } from './mapping';
-import { exerciseBodyParts, exerciseSlots, exercises, programs, setLogs, workouts } from './schema';
+import {
+  exerciseBodyParts,
+  exerciseSlots,
+  exerciseVariants,
+  exercises,
+  programs,
+  setLogs,
+  workouts,
+} from './schema';
 import { listActiveVariants } from './variants';
 
 type NameError = 'name-required' | 'name-too-long' | 'name-taken';
@@ -51,8 +60,19 @@ export async function addExercise(
     archivedAt: null,
     createdAt: now,
   };
+  const defaultVariant = {
+    id: crypto.randomUUID(),
+    exerciseId: row.id,
+    name: defaultVariantName,
+    nameKey: nameKey(defaultVariantName),
+    createdAt: now,
+    removedAt: null,
+  };
   try {
-    await db.insert(exercises).values(row);
+    await runBatch(db, [
+      db.insert(exercises).values(row),
+      db.insert(exerciseVariants).values(defaultVariant),
+    ]);
   } catch (error) {
     if (isUniqueConstraintViolation(error)) {
       return fail('name-taken');

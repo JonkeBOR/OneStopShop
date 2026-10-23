@@ -2,7 +2,7 @@ import 'server-only';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Database } from '@/lib/server/database';
 import type { ProgramSession } from '../domain/progress-chart';
-import type { ExerciseVariant } from '../domain/types';
+import type { RecordedVariant } from '../domain/types';
 import { toExerciseVariant } from './mapping';
 import { exerciseVariants, exercises, programs, workoutSessions } from './schema';
 
@@ -33,12 +33,15 @@ export async function listAllVariants(
   db: Database,
   profileId: string,
   exerciseId: string,
-): Promise<ExerciseVariant[]> {
+): Promise<RecordedVariant[]> {
   const rows = await db
     .select({ variant: exerciseVariants })
     .from(exerciseVariants)
     .innerJoin(exercises, eq(exercises.id, exerciseVariants.exerciseId))
     .where(and(eq(exerciseVariants.exerciseId, exerciseId), eq(exercises.profileId, profileId)))
     .orderBy(asc(exerciseVariants.createdAt), asc(exerciseVariants.id));
-  return rows.map((row) => toExerciseVariant(row.variant));
+  return rows.map((row) => ({
+    ...toExerciseVariant(row.variant),
+    isRetired: row.variant.removedAt !== null,
+  }));
 }

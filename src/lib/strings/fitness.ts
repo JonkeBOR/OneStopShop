@@ -62,9 +62,9 @@ export const fitnessStrings = {
     rangeLabel: 'Chart range',
     ranges: { '3m': '3 months', '1y': '1 year', all: 'All time' },
     variantLabel: 'Variant',
-    noVariant: 'No variant',
     legendLabel: 'Programs',
     deletedProgram: (name: string) => `${name} (deleted)`,
+    retiredVariant: (name: string) => `${name} (deleted)`,
     tooltip: (date: string, kg: string) => `${date} · ${kg} kg`,
     bodyweight: {
       heading: 'Bodyweight',
@@ -282,16 +282,11 @@ export const fitnessStrings = {
     musclesHeading: 'Muscles worked',
     variants: {
       heading: 'Variants',
-      empty: 'No variants. Add one for each gym or machine whose weights differ.',
       nameLabel: 'New variant name',
       add: 'Add variant',
-      firstConfirm:
-        'The last weights already recorded for this exercise will move to this variant.',
-      firstConfirmLabel: 'Move weights',
+      renameLabel: (name: string) => `Variant name, ${name}`,
       remove: (name: string) => `Remove ${name}`,
       removeConfirm: 'Last weights for this variant will be deleted.',
-      removeLastConfirm:
-        'This is the only variant. Removing it deletes the last weights recorded for this exercise.',
       removeConfirmLabel: 'Remove',
     },
   },
@@ -345,4 +340,5 @@ export const fitnessErrorStrings: Record<FitnessErrorCode, string> = {
   'variant-locked':
     'A set is already logged for this exercise, so its variant cannot be changed in this workout.',
   'variant-changed': 'This exercise was switched to another variant. The page has been refreshed.',
+  'last-variant': 'An exercise needs at least one variant.',
 };

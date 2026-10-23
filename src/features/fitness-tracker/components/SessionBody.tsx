@@ -43,12 +43,14 @@ function SlotSection({
           <h2 id={headingId} className={styles.exercise}>
             {slot.exercise.name}
           </h2>
-          {slot.variant ? <span className={styles.variant}>{slot.variant.name}</span> : null}
+          {slot.hasVariantChoice && slot.variant ? (
+            <span className={styles.variant}>{slot.variant.name}</span>
+          ) : null}
           {slot.isOptional ? (
             <span className={styles.tag}>{fitnessStrings.common.optional}</span>
           ) : null}
         </div>
-        {slot.variant ? (
+        {slot.hasVariantChoice && slot.variant ? (
           <Link
             className={styles.options}
             href={`/fitness-tracker/active/sessions/${session.id}/slots/${slot.id}`}

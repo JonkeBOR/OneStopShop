@@ -5,9 +5,14 @@ import { workoutSessions } from './schema';
 import { listAllVariants, listProgramSessions } from './progress';
 import { deleteProgram } from './programs';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
-import { createProgramFromSpec, expectOk, type ProgramSpec } from './storage-test-support';
+import {
+  createProgramFromSpec,
+  defaultVariantOf,
+  expectOk,
+  type ProgramSpec,
+} from './storage-test-support';
 import { finishWorkout, logSet, startWorkout } from './training';
-import { addVariant, removeVariant } from './variants';
+import { addVariant, removeVariant, renameVariant } from './variants';
 
 describe('reading program sessions and variants for progress charts', () => {
   let testDatabase: TestDatabase;
@@ -141,7 +146,11 @@ describe('reading program sessions and variants for progress charts', () => {
     const { db } = testDatabase;
     const program = await activate(profileId, 'Variant program');
     const exerciseId = program.workouts[0]?.slots[0]?.exercise.id ?? '';
-    const gymA = expectOk(await addVariant(db, profileId, exerciseId, { name: 'Gym A' }, tick()));
+    const gymA = expectOk(
+      await renameVariant(db, profileId, exerciseId, (await defaultVariantOf(db, exerciseId)).id, {
+        name: 'Gym A',
+      }),
+    );
     const gymB = expectOk(await addVariant(db, profileId, exerciseId, { name: 'Gym B' }, tick()));
     await logWorkout(profileId, program.workouts[0]?.id ?? '');
     const removal = expectOk(await removeVariant(db, profileId, exerciseId, gymA.id, tick()));
@@ -149,8 +158,8 @@ describe('reading program sessions and variants for progress charts', () => {
     const otherProfileId = (await ensureProfile(db, crypto.randomUUID(), tick())).id;
 
     expect(await listAllVariants(db, profileId, exerciseId)).toEqual([
-      { id: gymA.id, name: 'Gym A' },
-      { id: gymB.id, name: 'Gym B' },
+      { id: gymA.id, name: 'Gym A', isRetired: true },
+      { id: gymB.id, name: 'Gym B', isRetired: false },
     ]);
     expect(await listAllVariants(db, otherProfileId, exerciseId)).toEqual([]);
   });

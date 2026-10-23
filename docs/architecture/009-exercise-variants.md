@@ -1,6 +1,6 @@
 # 009 — Exercise variants
 
-**Status**: accepted
+**Status**: accepted; amended by [012](012-every-exercise-has-a-variant.md)
 **Date**: 2026-10-20
 
 ## Context
@@ -42,14 +42,16 @@ weights, load the target's weights and variant, delete the target's parked rows.
 Adding the first active variant (the exercise has none, which includes one whose variants were all
 removed) only stamps `variant_id` onto the exercise's planned sets. The weights stay where they are,
 so they become that variant's weights. Adding a later variant changes nothing else and starts
-without weights.
+without weights. Since [012](012-every-exercise-has-a-variant.md) every exercise has a variant, so
+adding one never moves weights.
 
 ### Removing a variant
 
 Removal is a retire (soft delete) when `set_logs` reference the variant, so history can still name
 it, and a hard delete otherwise. Either way the variant's parked weights are deleted and the slot
 falls back to the oldest remaining active variant, loading its parked weights. With none left, the
-slot has no variant and no weights.
+slot has no variant and no weights. [012](012-every-exercise-has-a-variant.md) refuses removing the
+last active variant.
 
 ### Switching is locked once a set is logged
 
@@ -90,4 +92,4 @@ is a plain column.
   `planned_sets` would make it RESTRICT.
 - History and progress views, when built, read `set_logs.variant_id` and must expect retired
   variants, and the database does not guarantee the id matches a row.
-- Renaming variants, switching outside a session and per-gym "switch all" shortcuts do not exist.
+- Switching outside a session and per-gym "switch all" shortcuts do not exist.

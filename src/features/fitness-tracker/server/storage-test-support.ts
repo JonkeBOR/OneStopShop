@@ -1,9 +1,10 @@
 import type { Result } from '../domain/result';
-import type { Program, TrainingOverview } from '../domain/types';
+import type { ExerciseVariant, Program, TrainingOverview } from '../domain/types';
 import type { Database } from '@/lib/server/database';
 import { addExercise, listExercises } from './exercises';
 import { addExerciseSlot, addWorkout, createProgram } from './programs';
 import { finishWorkout, getTrainingOverview, startWorkout } from './training';
+import { listActiveVariants } from './variants';
 
 export function expectOk<T, E extends string>(result: Result<T, E>): T {
   if (!result.ok) {
@@ -65,6 +66,14 @@ export async function createProgramFromSpec(
     }
   }
   return program;
+}
+
+export async function defaultVariantOf(db: Database, exerciseId: string): Promise<ExerciseVariant> {
+  const [oldest] = (await listActiveVariants(db, [exerciseId])).get(exerciseId) ?? [];
+  if (!oldest) {
+    throw new Error('Expected the exercise to have an active variant');
+  }
+  return oldest;
 }
 
 export async function activeOverview(db: Database, profileId: string): Promise<TrainingOverview> {
