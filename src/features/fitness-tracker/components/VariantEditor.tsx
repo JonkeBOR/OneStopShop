@@ -23,6 +23,7 @@ export function VariantEditor({ exerciseId, variants }: VariantEditorProps) {
                 currentName={variant.name}
                 url={`${url}/${variant.id}`}
                 isLabelHidden
+                submitsOnBlur
               />
             </div>
             {variants.length > 1 ? (

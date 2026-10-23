@@ -97,13 +97,10 @@ test('every exercise starts with a default variant that can be renamed, kept, sw
   await expect(
     page.getByRole('button', { name: variants.remove('Default'), exact: true }),
   ).toHaveCount(0);
-  await page.getByRole('textbox', { name: variants.renameLabel('Default') }).fill('Gym A');
-  await variantsRegion
-    .getByRole('listitem')
-    .filter({ has: page.getByRole('textbox', { name: variants.renameLabel('Default') }) })
-    .getByRole('button', { name: fitnessStrings.common.rename, exact: true })
-    .click();
-  await expect(variantsRegion).toContainText('Gym A');
+  const defaultName = page.getByRole('textbox', { name: variants.renameLabel('Default') });
+  await defaultName.fill('Gym A');
+  await defaultName.blur();
+  await expect(page.getByRole('textbox', { name: variants.renameLabel('Gym A') })).toBeVisible();
   await page.getByLabel(variants.nameLabel, { exact: true }).fill('Gym B');
   await page.getByRole('button', { name: variants.add, exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);

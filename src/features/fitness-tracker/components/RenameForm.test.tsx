@@ -47,6 +47,49 @@ describe('RenameForm', () => {
     expect(screen.getByText('Variant name, Gym A').className).toMatch(/visuallyHidden/);
   });
 
+  describe('saving on blur', () => {
+    function renderBlurForm() {
+      render(
+        <RenameForm
+          label="Variant name, Gym A"
+          currentName="Gym A"
+          url="/api/fitness/exercises/e1/variants/v1"
+          submitsOnBlur
+        />,
+      );
+      return screen.getByRole('textbox', { name: 'Variant name, Gym A' });
+    }
+
+    it('shows no Rename button', () => {
+      renderBlurForm();
+
+      expect(screen.queryByRole('button', { name: fitnessStrings.common.rename })).toBeNull();
+    });
+
+    it('sends the new name when the field loses focus', async () => {
+      fetchMock.mockResolvedValue(Response.json({}));
+      const input = renderBlurForm();
+
+      fireEvent.change(input, { target: { value: 'Gym B' } });
+      fireEvent.blur(input);
+
+      await waitFor(() => expect(router.refresh).toHaveBeenCalledTimes(1));
+      expect(fetchMock).toHaveBeenCalledWith('/api/fitness/exercises/e1/variants/v1', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'Gym B' }),
+      });
+    });
+
+    it('sends nothing when the name is unchanged', () => {
+      const input = renderBlurForm();
+
+      fireEvent.blur(input);
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
   it('sends the new name and refreshes', async () => {
     fetchMock.mockResolvedValue(Response.json({}));
     renderForm();

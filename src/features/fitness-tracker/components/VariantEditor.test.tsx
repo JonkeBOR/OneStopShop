@@ -76,12 +76,13 @@ describe('VariantEditor', () => {
     expect(screen.queryByRole('button', { name: copy.remove('Default') })).toBeNull();
   });
 
-  it('renames a variant', async () => {
+  it('renames a variant on leaving its field, without a Rename button', async () => {
     render(<VariantEditor exerciseId="e1" variants={[{ id: 'v1', name: 'Default' }]} />);
 
+    expect(screen.queryByRole('button', { name: fitnessStrings.common.rename })).toBeNull();
     const input = screen.getByRole('textbox', { name: copy.renameLabel('Default') });
     fireEvent.change(input, { target: { value: 'Gym A' } });
-    fireEvent.submit(input);
+    fireEvent.blur(input);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/fitness/exercises/e1/variants/v1');
