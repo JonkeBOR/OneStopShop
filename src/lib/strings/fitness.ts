@@ -282,17 +282,11 @@ export const fitnessStrings = {
     musclesHeading: 'Muscles worked',
     variants: {
       heading: 'Variants',
-      empty: 'No variants. Add one for each gym or machine whose weights differ.',
       nameLabel: 'New variant name',
       add: 'Add variant',
-      firstConfirm:
-        'The last weights already recorded for this exercise will move to this variant.',
-      firstConfirmLabel: 'Move weights',
       renameLabel: (name: string) => `Variant name, ${name}`,
       remove: (name: string) => `Remove ${name}`,
       removeConfirm: 'Last weights for this variant will be deleted.',
-      removeLastConfirm:
-        'This is the only variant. Removing it deletes the last weights recorded for this exercise.',
       removeConfirmLabel: 'Remove',
     },
   },

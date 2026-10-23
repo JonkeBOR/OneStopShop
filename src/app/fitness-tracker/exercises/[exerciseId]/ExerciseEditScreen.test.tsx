@@ -116,7 +116,11 @@ describe('ExerciseEditScreen', () => {
     const region = screen.getByRole('region', {
       name: fitnessStrings.exerciseEdit.variants.heading,
     });
-    expect(within(region).getByText('Gym A')).toBeDefined();
+    expect(
+      within(region).getByRole('textbox', {
+        name: fitnessStrings.exerciseEdit.variants.renameLabel('Gym A'),
+      }),
+    ).toBeDefined();
   });
 
   it('FR-036: renames the exercise and shows a taken name inline', async () => {

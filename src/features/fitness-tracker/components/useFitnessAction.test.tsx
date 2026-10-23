@@ -92,7 +92,7 @@ describe('useFitnessAction', () => {
     expect(router.refresh).not.toHaveBeenCalled();
   });
 
-  it.each(['set-already-logged', 'session-not-in-progress'] as const)(
+  it.each(['set-already-logged', 'session-not-in-progress', 'last-variant'] as const)(
     'edge case: %s shows its message and refreshes the stale page',
     async (code) => {
       fetchMock.mockResolvedValue(jsonResponse({ error: code }, 409));

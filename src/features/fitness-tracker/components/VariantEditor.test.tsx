@@ -37,7 +37,7 @@ describe('VariantEditor', () => {
   it('lists each variant with a remove button', () => {
     render(<VariantEditor exerciseId="e1" variants={variants} />);
 
-    expect(screen.getByText('Gym A')).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: copy.renameLabel('Gym A') })).toBeTruthy();
     expect(screen.getByRole('button', { name: copy.remove('Gym B') })).toBeTruthy();
   });
 
@@ -57,40 +57,40 @@ describe('VariantEditor', () => {
     render(<VariantEditor exerciseId="e1" variants={variants} />);
 
     expect(screen.getAllByText(copy.removeConfirm)).toHaveLength(2);
-    expect(screen.queryByText(copy.removeLastConfirm)).toBeNull();
   });
 
-  it('warns more strongly before removing the only variant', () => {
-    render(<VariantEditor exerciseId="e1" variants={[{ id: 'v1', name: 'Gym A' }]} />);
+  it('lists a lone variant with a rename form and no remove button', () => {
+    render(<VariantEditor exerciseId="e1" variants={[{ id: 'v1', name: 'Default' }]} />);
 
-    fireEvent.click(screen.getByRole('button', { name: copy.remove('Gym A') }));
-
-    expect(screen.getByText(copy.removeLastConfirm).closest('dialog[open]')).not.toBeNull();
-    expect(screen.queryByText(copy.removeConfirm)).toBeNull();
+    const input = screen.getByRole<HTMLInputElement>('textbox', {
+      name: copy.renameLabel('Default'),
+    });
+    expect(input.value).toBe('Default');
+    expect(screen.queryByRole('button', { name: copy.remove('Default') })).toBeNull();
   });
 
-  it('shows the empty text and asks before adding the first variant', async () => {
-    render(<VariantEditor exerciseId="e1" variants={[]} />);
-    expect(screen.getByText(copy.empty)).toBeTruthy();
+  it('renames a variant', async () => {
+    render(<VariantEditor exerciseId="e1" variants={[{ id: 'v1', name: 'Default' }]} />);
 
-    fireEvent.change(screen.getByLabelText(copy.nameLabel), { target: { value: 'Gym A' } });
-    fireEvent.click(screen.getByRole('button', { name: copy.add }));
-
-    expect(screen.getByText(copy.firstConfirm)).toBeTruthy();
-    expect(fetchMock).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: copy.firstConfirmLabel }));
+    const input = screen.getByRole('textbox', { name: copy.renameLabel('Default') });
+    fireEvent.change(input, { target: { value: 'Gym A' } });
+    fireEvent.submit(input);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/fitness/exercises/e1/variants');
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/fitness/exercises/e1/variants/v1');
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('PATCH');
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(JSON.stringify({ name: 'Gym A' }));
   });
 
-  it('adds further variants without a confirmation', async () => {
+  it('adds a variant without asking first', async () => {
     render(<VariantEditor exerciseId="e1" variants={variants} />);
 
     fireEvent.change(screen.getByLabelText(copy.nameLabel), { target: { value: 'Gym C' } });
     fireEvent.click(screen.getByRole('button', { name: copy.add }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    expect(screen.queryByText(copy.firstConfirm)).toBeNull();
+    expect(fetchMock.mock.calls[0]?.[0]).toBe('/api/fitness/exercises/e1/variants');
+    expect(fetchMock.mock.calls[0]?.[1]?.method).toBe('POST');
+    expect(document.querySelector('dialog[open]')).toBeNull();
   });
 });
