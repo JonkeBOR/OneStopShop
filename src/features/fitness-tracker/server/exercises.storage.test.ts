@@ -13,7 +13,7 @@ import { exerciseSlots, exerciseVariants } from './schema';
 import { createProgramFromSpec, defaultVariantOf, expectOk } from './storage-test-support';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
 import { logSet, startWorkout } from './training';
-import { addVariant, listActiveVariants, removeVariant, renameVariant } from './variants';
+import { addVariant, listActiveVariants, renameVariant } from './variants';
 
 describe('exercise catalog', () => {
   let testDatabase: TestDatabase;
@@ -273,15 +273,6 @@ describe('exercise usage', () => {
         },
       ),
     );
-    const goblet = expectOk(
-      await addVariant(
-        db,
-        profileId,
-        exercise.id,
-        { name: 'Goblet' },
-        new Date(now.getTime() + 1000),
-      ),
-    );
     const smith = expectOk(
       await addVariant(
         db,
@@ -291,11 +282,19 @@ describe('exercise usage', () => {
         new Date(now.getTime() + 2000),
       ),
     );
-    expectOk(await removeVariant(db, profileId, exercise.id, goblet.id, now));
+    const goblet = expectOk(
+      await addVariant(
+        db,
+        profileId,
+        exercise.id,
+        { name: 'Goblet' },
+        new Date(now.getTime() + 1000),
+      ),
+    );
 
     const usage = expectOk(await getExerciseUsage(db, profileId, exercise.id));
 
-    expect(usage.variants).toEqual([barbell, smith]);
+    expect(usage.variants).toEqual([barbell, goblet, smith]);
   });
 
   it('answers not-found for an exercise of another profile or one that does not exist', async () => {
