@@ -1,0 +1,5 @@
+INSERT INTO `exercise_variants` (`id`, `exercise_id`, `name`, `name_key`, `created_at`, `removed_at`) SELECT lower(hex(randomblob(16))), `e`.`id`, 'Default', 'default', CAST(strftime('%s', 'now') AS INTEGER) * 1000, NULL FROM `exercises` `e` WHERE NOT EXISTS (SELECT 1 FROM `exercise_variants` `v` WHERE `v`.`exercise_id` = `e`.`id` AND `v`.`removed_at` IS NULL);--> statement-breakpoint
+UPDATE `planned_sets` SET `variant_id` = (SELECT `v`.`id` FROM `exercise_slots` `s` JOIN `exercise_variants` `v` ON `v`.`exercise_id` = `s`.`exercise_id` WHERE `s`.`id` = `planned_sets`.`exercise_slot_id` AND `v`.`removed_at` IS NULL ORDER BY `v`.`created_at`, `v`.`id` LIMIT 1) WHERE `variant_id` IS NULL;--> statement-breakpoint
+DROP TRIGGER set_logs_no_update;--> statement-breakpoint
+UPDATE `set_logs` SET `variant_id` = (SELECT `v`.`id` FROM `exercise_variants` `v` WHERE `v`.`exercise_id` = `set_logs`.`exercise_id` ORDER BY `v`.`created_at`, `v`.`id` LIMIT 1) WHERE `variant_id` IS NULL;--> statement-breakpoint
+CREATE TRIGGER set_logs_no_update BEFORE UPDATE ON set_logs BEGIN SELECT RAISE(ABORT, 'set_logs are immutable'); END;

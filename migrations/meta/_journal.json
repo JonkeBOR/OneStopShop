@@ -78,6 +78,13 @@
       "when": 1792605528099,
       "tag": "0010_program_soft_delete",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1792758207099,
+      "tag": "0011_default_variants",
+      "breakpoints": true
     }
   ]
 }
