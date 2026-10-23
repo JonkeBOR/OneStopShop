@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { readConfig } from './config';
+import { readConfig, readGeminiConfig } from './config';
 
 const completeEnv = {
   GOOGLE_CLIENT_ID: 'client-id',
@@ -30,4 +30,17 @@ test('names every missing or empty variable without revealing any value', () => 
   expect(read).toThrow(/OWNER_EMAIL/);
   expect(read).not.toThrow(/client-secret-value/);
   expect(read).not.toThrow(/GOOGLE_CLIENT_SECRET/);
+});
+
+test('reads the Gemini key, trimmed', () => {
+  expect(readGeminiConfig({ GEMINI_API_KEY: '  gemini-key  ' })).toEqual({ apiKey: 'gemini-key' });
+});
+
+test('has no Gemini config when the key is missing or blank', () => {
+  expect(readGeminiConfig({})).toBeNull();
+  expect(readGeminiConfig({ GEMINI_API_KEY: '   ' })).toBeNull();
+});
+
+test('does not require the Gemini key for the rest of the configuration', () => {
+  expect(() => readConfig(completeEnv)).not.toThrow();
 });

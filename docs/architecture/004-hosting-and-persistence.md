@@ -89,9 +89,13 @@ Wrangler is recorded in [006-domain-persistence.md](006-domain-persistence.md).
 | `OWNER_EMAIL`          | `.env.local` and `.dev.vars` | `wrangler.jsonc` `vars` |
 | `GOOGLE_CLIENT_SECRET` | `.env.local` and `.dev.vars` | `wrangler secret put`   |
 | `SESSION_SECRET`       | `.env.local` and `.dev.vars` | `wrangler secret put`   |
+| `GEMINI_API_KEY`       | `.env.local` and `.dev.vars` | `wrangler secret put`   |
 
 Only `src/lib/server/config.ts` reads them. The OAuth redirect URI is derived from the request's
 origin, so there is no `APP_URL`.
+
+`GEMINI_API_KEY` is optional: without it the finished screen shows only the fixed affirmations.
+See [013](013-ai-affirmations.md).
 
 ## Consequences
 
