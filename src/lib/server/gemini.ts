@@ -116,6 +116,7 @@ export async function generateJson(
       signal: AbortSignal.timeout(timeoutMilliseconds),
     });
     if (!response.ok) {
+      void response.body?.cancel().catch(() => undefined);
       return warn(`status ${response.status}`);
     }
     return readAnswer((await response.json()) as unknown);

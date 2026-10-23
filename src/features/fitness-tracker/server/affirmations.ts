@@ -1,7 +1,7 @@
 import 'server-only';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Database } from '@/lib/server/database';
-import type { GenerateJson } from '@/lib/server/gemini';
+import { getGeminiGenerator, type GenerateJson } from '@/lib/server/gemini';
 import {
   affirmationFacts,
   dailyAffirmationCap,
@@ -101,6 +101,44 @@ export async function writeAffirmation(
   return parseAffirmation(answer);
 }
 
+function warnFailed(kind: string): null {
+  console.warn(`Affirmation failed: ${kind}`);
+  return null;
+}
+
+async function claimedAffirmation(
+  db: Database,
+  profileId: string,
+  session: SessionView,
+  now: Date,
+  generate: GenerateJson,
+): Promise<string | null> {
+  let claimed: boolean;
+  try {
+    claimed = await claimAffirmation(db, profileId, session.id, now);
+  } catch {
+    return warnFailed('storage');
+  }
+  if (!claimed) {
+    return null;
+  }
+  let written: string | null;
+  try {
+    written = await writeAffirmation(generate, affirmationFacts(session));
+  } catch {
+    return warnFailed('generator');
+  }
+  if (written === null) {
+    return null;
+  }
+  try {
+    await saveAffirmation(db, profileId, session.id, written);
+  } catch {
+    warnFailed('storage');
+  }
+  return written;
+}
+
 export async function affirmationFor(
   db: Database,
   profileId: string,
@@ -108,19 +146,26 @@ export async function affirmationFor(
   now: Date,
   generate: GenerateJson | null,
 ): Promise<string | null> {
-  const stored = await readAffirmation(db, profileId, session.id);
+  let stored: string | null;
+  try {
+    stored = await readAffirmation(db, profileId, session.id);
+  } catch {
+    return warnFailed('storage');
+  }
   if (stored !== null) {
     return stored;
   }
   if (generate === null) {
     return null;
   }
-  if (!(await claimAffirmation(db, profileId, session.id, now))) {
-    return null;
-  }
-  const written = await writeAffirmation(generate, affirmationFacts(session));
-  if (written !== null) {
-    await saveAffirmation(db, profileId, session.id, written);
-  }
-  return written;
+  return claimedAffirmation(db, profileId, session, now, generate);
+}
+
+export async function finishedSessionAffirmation(
+  db: Database,
+  profileId: string,
+  session: SessionView,
+  now: Date,
+): Promise<string | null> {
+  return affirmationFor(db, profileId, session, now, getGeminiGenerator());
 }

@@ -1,7 +1,6 @@
 import type { SessionView } from '@/features/fitness-tracker/domain/types';
-import { affirmationFor } from '@/features/fitness-tracker/server/affirmations';
+import { finishedSessionAffirmation } from '@/features/fitness-tracker/server/affirmations';
 import type { Database } from '@/lib/server/database';
-import { getGeminiGenerator } from '@/lib/server/gemini';
 import { fitnessStrings } from '@/lib/strings/fitness';
 
 type SessionAffirmationProps = {
@@ -17,6 +16,6 @@ function randomAffirmation(): string {
 }
 
 export async function SessionAffirmation({ db, profileId, session, now }: SessionAffirmationProps) {
-  const text = await affirmationFor(db, profileId, session, now, getGeminiGenerator());
+  const text = await finishedSessionAffirmation(db, profileId, session, now);
   return text ?? randomAffirmation();
 }

@@ -164,6 +164,16 @@ describe('generateJson', () => {
     }
   });
 
+  test('cancels the body of an error response', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream({ cancel });
+    const response = new Response(body, { status: 429 });
+
+    await generateJson(config, request, resolvingTo(response));
+
+    expect(cancel).toHaveBeenCalledTimes(1);
+  });
+
   test('returns null on a server error', async () => {
     const result = await generateJson(config, request, resolvingTo(geminiResponse({}, 503)));
 

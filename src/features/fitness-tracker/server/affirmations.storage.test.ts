@@ -1,4 +1,14 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from 'vitest';
 import type { GenerateJson } from '@/lib/server/gemini';
 import { dailyAffirmationCap } from '../domain/affirmation';
 import { activateProgram } from './activation';
@@ -94,6 +104,13 @@ describe('affirmations', () => {
     expect(await claimAffirmation(testDatabase.db, profileId, sessionId, now)).toBe(true);
   });
 
+  it('counts a claim made just inside the 24 hours', async () => {
+    await claimTenSessions(new Date(now.getTime() - dayInMilliseconds + 1));
+    const sessionId = await finishedSessionId(now);
+
+    expect(await claimAffirmation(testDatabase.db, profileId, sessionId, now)).toBe(false);
+  });
+
   it('reads nothing before an affirmation is saved', async () => {
     const sessionId = await finishedSessionId(now);
 
@@ -166,6 +183,72 @@ describe('affirmations', () => {
       expect(await affirmationFor(db, profileId, session, now, failing)).toBeNull();
       expect(await affirmationFor(db, profileId, session, now, succeeding)).toBeNull();
       expect(succeeding).not.toHaveBeenCalled();
+    });
+
+    describe('when the flow fails', () => {
+      let warn: MockInstance<(...data: unknown[]) => void>;
+
+      beforeEach(() => {
+        warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      });
+
+      afterEach(() => {
+        warn.mockRestore();
+      });
+
+      it('gives nothing when the generator rejects, and does not retry', async () => {
+        const { db } = testDatabase;
+        const session = await finishedSession(now);
+        const failing = vi.fn<GenerateJson>().mockRejectedValue(new Error('boom'));
+        const succeeding = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
+
+        expect(await affirmationFor(db, profileId, session, now, failing)).toBeNull();
+        expect(await affirmationFor(db, profileId, session, now, succeeding)).toBeNull();
+        expect(succeeding).not.toHaveBeenCalled();
+      });
+
+      it('returns the written text even when saving fails', async () => {
+        const { db } = testDatabase;
+        const session = await finishedSession(now);
+        const generate = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
+        let updates = 0;
+        const failingSave = new Proxy(db, {
+          get(target, property, receiver) {
+            if (property !== 'update') {
+              return Reflect.get(target, property, receiver) as unknown;
+            }
+            return (...args: Parameters<typeof target.update>) => {
+              updates += 1;
+              if (updates === 2) {
+                throw new Error('save failed');
+              }
+              return target.update(...args);
+            };
+          },
+        });
+
+        expect(await affirmationFor(failingSave, profileId, session, now, generate)).toBe('Huge.');
+        expect(warn).toHaveBeenCalledWith('Affirmation failed: storage');
+      });
+
+      it('gives nothing when storage fails before the claim', async () => {
+        const { db } = testDatabase;
+        const session = await finishedSession(now);
+        const generate = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
+        const failingRead = new Proxy(db, {
+          get(target, property, receiver) {
+            if (property === 'select') {
+              return () => {
+                throw new Error('read failed');
+              };
+            }
+            return Reflect.get(target, property, receiver) as unknown;
+          },
+        });
+
+        expect(await affirmationFor(failingRead, profileId, session, now, generate)).toBeNull();
+        expect(generate).not.toHaveBeenCalled();
+      });
     });
 
     it('loses to a render that already claimed', async () => {

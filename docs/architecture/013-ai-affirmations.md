@@ -66,7 +66,8 @@ session cookie can therefore trigger at most ten Gemini calls a day.
 A failed, slow, blocked, rate-limited or invalid answer is not retried. The request has a 4 second
 timeout, and any failure resolves to `null`, which shows a random fixed line. Retrying on reload would
 turn an outage into a reload-driven request loop. The claim is never cleared, so a session keeps its
-fixed line for good.
+fixed line for good. A storage or generator error anywhere in the flow also falls back to a fixed
+line, and a failed save still shows the text that was written.
 
 ### What is sent to Google
 
