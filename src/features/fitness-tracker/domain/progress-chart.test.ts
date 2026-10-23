@@ -179,7 +179,7 @@ function setLog(overrides: {
     setNumber: 1,
     reps: overrides.reps,
     weightKg: overrides.weightKg,
-    variantId: overrides.variantId ?? null,
+    variantId: overrides.variantId === undefined ? 'a' : overrides.variantId,
     context: {
       programId: 'p',
       cycleId: 'c',
@@ -206,8 +206,8 @@ function chartFor(
     metric: extra.metric ?? '1rm',
     setLogs,
     variants: [
-      { id: 'a', name: 'Gym A' },
-      { id: 'b', name: 'Gym B' },
+      { id: 'a', name: 'Gym A', isRetired: false },
+      { id: 'b', name: 'Gym B', isRetired: false },
     ],
     sessions: extra.sessions ?? [],
     today: '2026-10-21',
@@ -239,12 +239,45 @@ describe('exerciseChart estimated 1RM', () => {
     const chart = chartFor([
       setLog({ day: '2026-10-01', reps: 5, weightKg: 80, variantId: 'a' }),
       setLog({ day: '2026-10-10', reps: 5, weightKg: 80, variantId: 'b' }),
-      setLog({ day: '2026-10-05', reps: 5, weightKg: 80 }),
+      setLog({ day: '2026-10-05', reps: 5, weightKg: 80, variantId: 'a' }),
     ]);
-    expect(chart.chips.map((chip) => chip.param)).toEqual(['b', 'none', 'a']);
-    expect(chart.chips.map((chip) => chip.variantName)).toEqual(['Gym B', null, 'Gym A']);
+    expect(chart.chips.map((chip) => chip.param)).toEqual(['b', 'a']);
+    expect(chart.chips.map((chip) => chip.variantName)).toEqual(['Gym B', 'Gym A']);
     expect(chart.selectedParam).toBe('b');
-    expect(chart.chips.map((chip) => chip.isSelected)).toEqual([true, false, false]);
+    expect(chart.chips.map((chip) => chip.isSelected)).toEqual([true, false]);
+  });
+
+  it('leaves out logs without a variant', () => {
+    const chart = chartFor([
+      setLog({ day: '2026-10-01', reps: 5, weightKg: 80, variantId: null }),
+      setLog({ day: '2026-10-02', reps: 5, weightKg: 80, variantId: null }),
+      setLog({ day: '2026-10-03', reps: 5, weightKg: 80, variantId: 'a' }),
+    ]);
+    expect(chart.points).toEqual([{ time: chartTime('2026-10-03'), kg: 80 * (1 + 5 / 30) }]);
+    expect(chart.chips).toEqual([]);
+  });
+
+  it('marks a retired variant’s chip', () => {
+    const chart = exerciseChart({
+      metric: '1rm',
+      setLogs: [
+        setLog({ day: '2026-10-01', reps: 5, weightKg: 80, variantId: 'a' }),
+        setLog({ day: '2026-10-02', reps: 5, weightKg: 80, variantId: 'b' }),
+      ],
+      variants: [
+        { id: 'a', name: 'Gym A', isRetired: true },
+        { id: 'b', name: 'Gym B', isRetired: false },
+      ],
+      sessions: [],
+      today: '2026-10-21',
+      timeZone: 'UTC',
+      range: '3m',
+      requestedVariant: undefined,
+    });
+    expect(chart.chips.map((chip) => [chip.param, chip.isRetired])).toEqual([
+      ['b', false],
+      ['a', true],
+    ]);
   });
 
   it('selects the requested variant when it has points', () => {
@@ -262,19 +295,19 @@ describe('exerciseChart estimated 1RM', () => {
     const logs = [
       setLog({ day: '2025-01-01', reps: 5, weightKg: 80, variantId: 'a' }),
       setLog({ day: '2026-10-10', reps: 5, weightKg: 80, variantId: 'b' }),
-      setLog({ day: '2026-10-11', reps: 5, weightKg: 80 }),
+      setLog({ day: '2026-10-11', reps: 5, weightKg: 80, variantId: 'b' }),
     ];
-    expect(chartFor(logs, { requestedVariant: 'nonsense' }).selectedParam).toBe('none');
-    expect(chartFor(logs, { requestedVariant: 'a' }).selectedParam).toBe('none');
+    expect(chartFor(logs, { requestedVariant: 'nonsense' }).selectedParam).toBe('b');
+    expect(chartFor(logs, { requestedVariant: 'a' }).selectedParam).toBe('b');
   });
 
   it('shows no chips for a single series and no points when nothing qualifies', () => {
-    const single = chartFor([setLog({ day: '2026-10-10', reps: 5, weightKg: 80 })]);
+    const single = chartFor([setLog({ day: '2026-10-10', reps: 5, weightKg: 80, variantId: 'a' })]);
     expect(single.chips).toEqual([]);
-    expect(single.selectedParam).toBe('none');
+    expect(single.selectedParam).toBe('a');
     const none = chartFor([
-      setLog({ day: '2026-10-10', reps: 15, weightKg: 40 }),
-      setLog({ day: '2026-10-11', reps: 5, weightKg: null }),
+      setLog({ day: '2026-10-10', reps: 15, weightKg: 40, variantId: 'a' }),
+      setLog({ day: '2026-10-11', reps: 5, weightKg: null, variantId: 'a' }),
     ]);
     expect(none.chips).toEqual([]);
     expect(none.selectedParam).toBeNull();

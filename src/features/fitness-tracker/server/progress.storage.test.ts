@@ -158,8 +158,8 @@ describe('reading program sessions and variants for progress charts', () => {
     const otherProfileId = (await ensureProfile(db, crypto.randomUUID(), tick())).id;
 
     expect(await listAllVariants(db, profileId, exerciseId)).toEqual([
-      { id: gymA.id, name: 'Gym A' },
-      { id: gymB.id, name: 'Gym B' },
+      { id: gymA.id, name: 'Gym A', isRetired: true },
+      { id: gymB.id, name: 'Gym B', isRetired: false },
     ]);
     expect(await listAllVariants(db, otherProfileId, exerciseId)).toEqual([]);
   });

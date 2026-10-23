@@ -7,6 +7,8 @@ export type Exercise = { id: string; name: string; isArchived: boolean };
 
 export type ExerciseVariant = { id: string; name: string };
 
+export type RecordedVariant = ExerciseVariant & { isRetired: boolean };
+
 export type BodyPartView = { id: BodyPart; name: string };
 
 export type SessionStatus = 'in_progress' | 'finished';

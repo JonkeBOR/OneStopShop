@@ -24,7 +24,7 @@ const variantFilter = {
   value: 'v1',
   options: [
     { value: 'v1', text: 'Gym A', href: '/e1?variant=v1' },
-    { value: 'none', text: progress.noVariant, href: '/e1?variant=none' },
+    { value: 'v2', text: 'Gym B', href: '/e1?variant=v2' },
   ],
 };
 

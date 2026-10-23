@@ -342,8 +342,8 @@ describe('ExerciseEditScreen', () => {
         chartWith({
           selectedParam: 'v1',
           chips: [
-            { param: 'v1', variantName: 'Gym A', isSelected: true },
-            { param: 'none', variantName: null, isSelected: false },
+            { param: 'v1', variantName: 'Gym A', isRetired: false, isSelected: true },
+            { param: 'v2', variantName: 'Gym B', isRetired: false, isSelected: false },
           ],
         }),
       );
@@ -404,14 +404,14 @@ describe('ExerciseEditScreen', () => {
       );
     });
 
-    it('shows a variant dropdown beside the range only when there are several series, with "No variant" for the null series', () => {
+    it('shows a variant dropdown beside the range only when there are several series, labelling a retired variant as deleted', () => {
       renderScreen(
         {},
         chartWith({
           selectedParam: 'v1',
           chips: [
-            { param: 'v1', variantName: 'Gym A', isSelected: true },
-            { param: 'none', variantName: null, isSelected: false },
+            { param: 'v1', variantName: 'Gym A', isRetired: false, isSelected: true },
+            { param: 'v2', variantName: 'Gym B', isRetired: true, isSelected: false },
           ],
         }),
       );
@@ -424,11 +424,11 @@ describe('ExerciseEditScreen', () => {
         within(variant)
           .getAllByRole('option')
           .map((option) => option.textContent),
-      ).toEqual(['Gym A', progress.noVariant]);
-      choose(progress.variantLabel, 'none');
+      ).toEqual(['Gym A', progress.retiredVariant('Gym B')]);
+      choose(progress.variantLabel, 'v2');
 
       expect(router.push).toHaveBeenCalledWith(
-        '/fitness-tracker/exercises/e1?metric=heaviest&range=3m&variant=none',
+        '/fitness-tracker/exercises/e1?metric=heaviest&range=3m&variant=v2',
         { scroll: false },
       );
     });

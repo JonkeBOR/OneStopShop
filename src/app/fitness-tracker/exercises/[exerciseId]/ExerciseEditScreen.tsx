@@ -66,7 +66,7 @@ function ProgressSection({ exerciseId, chart }: { exerciseId: string; chart: Exe
     value: chart.selectedParam ?? '',
     options: chart.chips.map((chip) => ({
       value: chip.param,
-      text: chip.variantName ?? progress.noVariant,
+      text: chip.isRetired ? progress.retiredVariant(chip.variantName) : chip.variantName,
       href: chartHref(exerciseId, chart.metric, chart.range, chip.param),
     })),
   };

@@ -1,4 +1,4 @@
-import type { BodyweightEntry, ExerciseVariant, SetLog } from './types';
+import type { BodyweightEntry, RecordedVariant, SetLog } from './types';
 import { localDate } from './values';
 
 export const chartRanges = ['3m', '1y', 'all'] as const;
@@ -70,8 +70,6 @@ export const exerciseMetrics = ['heaviest', '1rm'] as const;
 
 export type ExerciseMetric = (typeof exerciseMetrics)[number];
 
-export const noVariantParam = 'none';
-
 export const programBandColorCount = 4;
 
 const MAX_ESTIMATE_REPS = 12;
@@ -100,7 +98,12 @@ export type LegendEntry = {
   colorIndex: number;
 };
 
-export type SeriesChip = { param: string; variantName: string | null; isSelected: boolean };
+export type SeriesChip = {
+  param: string;
+  variantName: string;
+  isRetired: boolean;
+  isSelected: boolean;
+};
 
 export type ExerciseChart = {
   metric: ExerciseMetric;
@@ -116,7 +119,7 @@ export type ExerciseChart = {
 type ExerciseChartInput = {
   metric: ExerciseMetric;
   setLogs: readonly SetLog[];
-  variants: readonly ExerciseVariant[];
+  variants: readonly RecordedVariant[];
   sessions: readonly ProgramSession[];
   today: string;
   timeZone: string;
@@ -137,10 +140,6 @@ export function estimatedOneRepMaxKg(reps: number, weightKg: number | null): num
   return reps === 1 ? weightKg : weightKg * (1 + reps / EPLEY_DIVISOR);
 }
 
-export function variantParam(variantId: string | null): string {
-  return variantId ?? noVariantParam;
-}
-
 function metricKg(metric: ExerciseMetric, log: SetLog): number | null {
   return metric === '1rm' ? estimatedOneRepMaxKg(log.reps, log.weightKg) : log.weightKg;
 }
@@ -154,10 +153,10 @@ function seriesFromLogs(
   const bestBySession = new Map<string, Map<string, { kg: number; day: string }>>();
   for (const log of setLogs) {
     const kg = metricKg(metric, log);
-    if (kg === null) {
+    if (kg === null || log.variantId === null) {
       continue;
     }
-    const param = variantParam(log.variantId);
+    const param = log.variantId;
     const sessions = bestBySession.get(param) ?? new Map<string, { kg: number; day: string }>();
     const best = sessions.get(log.context.workoutSessionId);
     if (best === undefined || kg > best.kg) {
@@ -258,9 +257,9 @@ function dataDomain(
 export function exerciseChart(input: ExerciseChartInput): ExerciseChart {
   const { metric, today, timeZone, range } = input;
   const start = rangeStartDate(today, range);
-  const variantNames = new Map(input.variants.map((variant) => [variant.id, variant.name]));
+  const variantsById = new Map(input.variants.map((variant) => [variant.id, variant]));
   const series = seriesFromLogs(input.setLogs, metric, timeZone, start)
-    .filter((candidate) => candidate.param === noVariantParam || variantNames.has(candidate.param))
+    .filter((candidate) => variantsById.has(candidate.param))
     .toSorted((a, b) => lastTime(b) - lastTime(a));
   const selected =
     series.find((candidate) => candidate.param === input.requestedVariant) ?? series[0];
@@ -273,11 +272,19 @@ export function exerciseChart(input: ExerciseChartInput): ExerciseChart {
     chips:
       series.length < 2
         ? []
-        : series.map((candidate) => ({
-            param: candidate.param,
-            variantName: variantNames.get(candidate.param) ?? null,
-            isSelected: candidate === selected,
-          })),
+        : series.flatMap((candidate) => {
+            const variant = variantsById.get(candidate.param);
+            return variant === undefined
+              ? []
+              : [
+                  {
+                    param: candidate.param,
+                    variantName: variant.name,
+                    isRetired: variant.isRetired,
+                    isSelected: candidate === selected,
+                  },
+                ];
+          }),
     selectedParam: selected?.param ?? null,
     points,
     bands,

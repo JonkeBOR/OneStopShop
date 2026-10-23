@@ -62,7 +62,6 @@ export const fitnessStrings = {
     rangeLabel: 'Chart range',
     ranges: { '3m': '3 months', '1y': '1 year', all: 'All time' },
     variantLabel: 'Variant',
-    noVariant: 'No variant',
     legendLabel: 'Programs',
     deletedProgram: (name: string) => `${name} (deleted)`,
     retiredVariant: (name: string) => `${name} (deleted)`,
