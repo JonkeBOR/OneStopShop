@@ -91,6 +91,7 @@ export type SessionSlot = {
   plannedSets: SessionPlannedSet[];
   loggedSets: SetLog[];
   variant: ExerciseVariant | null;
+  hasVariantChoice: boolean;
 };
 
 export type SessionSlotSettings = {

@@ -328,7 +328,9 @@ describe('WorkoutSessionScreen', () => {
       return {
         ...session,
         slots: session.slots.map((slot) =>
-          slot.id === 's1' ? { ...slot, variant: { id: 'v1', name: 'Barbell' } } : slot,
+          slot.id === 's1'
+            ? { ...slot, variant: { id: 'v1', name: 'Barbell' }, hasVariantChoice: true }
+            : slot,
         ),
       };
     }
@@ -361,6 +363,37 @@ describe('WorkoutSessionScreen', () => {
 
       expect(within(section('Curl')).queryByText('Barbell')).toBeNull();
       expect(optionsLink('Curl')).toBeNull();
+    });
+
+    it('shows the variant and the options link only when there is a choice', () => {
+      const lone = withVariant(freshSession());
+      const single: SessionView = {
+        ...lone,
+        slots: lone.slots.map((slot) =>
+          slot.id === 's1'
+            ? { ...slot, variant: { id: 'v1', name: 'Default' }, hasVariantChoice: false }
+            : slot,
+        ),
+      };
+      const { unmount } = render(<WorkoutSessionScreen session={single} />);
+
+      expect(screen.queryByText('Default')).toBeNull();
+      expect(optionsLink(bench)).toBeNull();
+      unmount();
+
+      render(
+        <WorkoutSessionScreen
+          session={{
+            ...single,
+            slots: single.slots.map((slot) =>
+              slot.id === 's1' ? { ...slot, hasVariantChoice: true } : slot,
+            ),
+          }}
+        />,
+      );
+
+      expect(screen.getByText('Default')).toBeDefined();
+      expect(optionsLink(bench)).not.toBeNull();
     });
 
     it('offers no variant picker on the session', () => {

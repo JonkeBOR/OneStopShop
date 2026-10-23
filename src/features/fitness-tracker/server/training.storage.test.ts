@@ -20,7 +20,7 @@ import {
   logSet,
   startWorkout,
 } from './training';
-import { addVariant, renameVariant, switchSlotVariant } from './variants';
+import { addVariant, removeVariant, renameVariant, switchSlotVariant } from './variants';
 
 describe('training', () => {
   let testDatabase: TestDatabase;
@@ -453,6 +453,46 @@ describe('training', () => {
       const view = expectOk(await getSession(db, profileId, session.id));
 
       expect(view.slots.find((slot) => slot.id === slotId)?.variant).toEqual(barbell);
+    });
+
+    it('getSession offers a variant choice only for an exercise with several active variants', async () => {
+      const { db } = testDatabase;
+      const program = await activeProgram({
+        blockCount: 1,
+        workouts: [{ name: 'Lower A', slots: [{ exercise: 'Squat', targetReps: [5] }] }],
+      });
+      const slot = program.workouts[0]?.slots[0];
+      const exerciseId = slot?.exercise.id ?? '';
+      const session = await open(program.workouts[0]?.id ?? '');
+      const slotView = async () => expectOk(await getSession(db, profileId, session.id)).slots[0];
+
+      expect(await slotView()).toMatchObject({
+        hasVariantChoice: false,
+        variant: { name: 'Default' },
+      });
+
+      const gymB = expectOk(await addVariant(db, profileId, exerciseId, { name: 'Gym B' }, later));
+      expect((await slotView())?.hasVariantChoice).toBe(true);
+
+      expectOk(
+        await switchSlotVariant(db, profileId, session.id, slot?.id ?? '', { variantId: gymB.id }),
+      );
+      expectOk(
+        await logSet(
+          db,
+          profileId,
+          session.id,
+          session.slots[0]?.plannedSets[0]?.id ?? '',
+          { reps: 5, weightKg: 30 },
+          now,
+        ),
+      );
+      expectOk(await removeVariant(db, profileId, exerciseId, gymB.id, later));
+
+      expect(await slotView()).toMatchObject({
+        hasVariantChoice: false,
+        variant: { name: 'Default' },
+      });
     });
 
     it('getSessionSlotSettings lists the active variants oldest first, the selection and the block’s planned sets', async () => {
