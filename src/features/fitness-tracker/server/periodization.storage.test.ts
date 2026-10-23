@@ -11,9 +11,9 @@ import {
 } from './programs';
 import { plannedSets, plannedSetVariantWeights } from './schema';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
-import { createProgramFromSpec, expectOk } from './storage-test-support';
+import { createProgramFromSpec, defaultVariantOf, expectOk } from './storage-test-support';
 import { finishWorkout, logSet, startWorkout } from './training';
-import { addVariant } from './variants';
+import { addVariant, renameVariant } from './variants';
 
 describe('periodization', () => {
   let testDatabase: TestDatabase;
@@ -104,11 +104,15 @@ describe('periodization', () => {
   }
 
   async function addVariants(exerciseId: string, names: readonly string[]): Promise<string[]> {
-    const ids: string[] = [];
-    for (const name of names) {
-      ids.push(
-        expectOk(await addVariant(testDatabase.db, profileId, exerciseId, { name }, tick())).id,
-      );
+    const { db } = testDatabase;
+    const [first, ...rest] = names;
+    const defaultVariant = await defaultVariantOf(db, exerciseId);
+    expectOk(
+      await renameVariant(db, profileId, exerciseId, defaultVariant.id, { name: first ?? '' }),
+    );
+    const ids = [defaultVariant.id];
+    for (const name of rest) {
+      ids.push(expectOk(await addVariant(db, profileId, exerciseId, { name }, tick())).id);
     }
     return ids;
   }

@@ -179,7 +179,11 @@ describe('training handlers', () => {
       const program = await activeProgram();
       const sessionId = await start(program.workouts[0]?.id ?? '');
       const session = expectOk(await getSession(testDatabase.db, profileId, sessionId));
-      return { sessionId, plannedSets: session.slots[0]?.plannedSets ?? [] };
+      return {
+        sessionId,
+        plannedSets: session.slots[0]?.plannedSets ?? [],
+        variantId: session.slots[0]?.variant?.id,
+      };
     }
 
     function log(sessionId: string, body: unknown) {
@@ -316,13 +320,13 @@ describe('training handlers', () => {
     });
 
     it('records a set meant for the variant the slot shows', async () => {
-      const { sessionId, plannedSets } = await openSession();
+      const { sessionId, plannedSets, variantId } = await openSession();
 
       const response = await log(sessionId, {
         plannedSetId: plannedSets[0]?.id,
         reps: 5,
         weightKg: 40,
-        variantId: null,
+        variantId,
       });
 
       expect(response.status).toBe(200);

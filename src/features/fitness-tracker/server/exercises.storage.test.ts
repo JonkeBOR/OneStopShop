@@ -9,11 +9,11 @@ import {
   unarchiveExercise,
 } from './exercises';
 import { ensureProfile } from './profile';
-import { exerciseSlots } from './schema';
-import { createProgramFromSpec, expectOk } from './storage-test-support';
+import { exerciseSlots, exerciseVariants } from './schema';
+import { createProgramFromSpec, defaultVariantOf, expectOk } from './storage-test-support';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
 import { logSet, startWorkout } from './training';
-import { addVariant, removeVariant } from './variants';
+import { addVariant, listActiveVariants, removeVariant, renameVariant } from './variants';
 
 describe('exercise catalog', () => {
   let testDatabase: TestDatabase;
@@ -42,6 +42,28 @@ describe('exercise catalog', () => {
     const duplicate = await addExercise(db, profileId, { name: '  incline BENCH press ' }, now);
     expect(duplicate).toEqual({ ok: false, error: 'name-taken' });
     expect(await listExercises(db, profileId, { includeArchived: false })).toHaveLength(1);
+  });
+
+  it('a new exercise has one active variant named Default', async () => {
+    const { db } = testDatabase;
+    const added = expectOk(await addExercise(db, profileId, { name: 'Squat' }, now));
+
+    const variants = await listActiveVariants(db, [added.id]);
+
+    expect(variants.get(added.id)).toEqual([
+      { id: (await defaultVariantOf(db, added.id)).id, name: 'Default' },
+    ]);
+  });
+
+  it('a refused exercise name creates no variant', async () => {
+    const { db } = testDatabase;
+    expectOk(await addExercise(db, profileId, { name: 'Squat' }, now));
+    const before = await db.select().from(exerciseVariants);
+
+    const duplicate = await addExercise(db, profileId, { name: 'squat' }, now);
+
+    expect(duplicate).toEqual({ ok: false, error: 'name-taken' });
+    expect(await db.select().from(exerciseVariants)).toHaveLength(before.length);
   });
 
   it('allows the same name in different profiles', async () => {
@@ -233,24 +255,23 @@ describe('exercise usage', () => {
       slots: [],
       hasSetLogs: false,
       bodyParts: [],
-      variants: [],
+      variants: [{ id: (await defaultVariantOf(db, exercise.id)).id, name: 'Default' }],
     });
   });
 
   it('getExerciseUsage lists active variants oldest first', async () => {
     const { db } = testDatabase;
     const exercise = expectOk(await addExercise(db, profileId, { name: 'Squat' }, now));
-    const smith = expectOk(
-      await addVariant(
+    const barbell = expectOk(
+      await renameVariant(
         db,
         profileId,
         exercise.id,
-        { name: 'Smith' },
-        new Date(now.getTime() + 2000),
+        (await defaultVariantOf(db, exercise.id)).id,
+        {
+          name: 'Barbell',
+        },
       ),
-    );
-    const barbell = expectOk(
-      await addVariant(db, profileId, exercise.id, { name: 'Barbell' }, now),
     );
     const goblet = expectOk(
       await addVariant(
@@ -259,6 +280,15 @@ describe('exercise usage', () => {
         exercise.id,
         { name: 'Goblet' },
         new Date(now.getTime() + 1000),
+      ),
+    );
+    const smith = expectOk(
+      await addVariant(
+        db,
+        profileId,
+        exercise.id,
+        { name: 'Smith' },
+        new Date(now.getTime() + 2000),
       ),
     );
     expectOk(await removeVariant(db, profileId, exercise.id, goblet.id, now));

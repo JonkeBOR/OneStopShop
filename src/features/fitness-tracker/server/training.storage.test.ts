@@ -6,7 +6,12 @@ import { ensureProfile } from './profile';
 import { getProgram } from './programs';
 import { cycles, plannedSets, plannedSetVariantWeights, setLogs } from './schema';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
-import { createProgramFromSpec, expectOk, type ProgramSpec } from './storage-test-support';
+import {
+  createProgramFromSpec,
+  defaultVariantOf,
+  expectOk,
+  type ProgramSpec,
+} from './storage-test-support';
 import {
   finishWorkout,
   getSession,
@@ -15,7 +20,7 @@ import {
   logSet,
   startWorkout,
 } from './training';
-import { addVariant, switchSlotVariant } from './variants';
+import { addVariant, renameVariant, switchSlotVariant } from './variants';
 
 describe('training', () => {
   let testDatabase: TestDatabase;
@@ -419,14 +424,21 @@ describe('training', () => {
       const slot = program.workouts[0]?.slots[0];
       const exerciseId = slot?.exercise.id ?? '';
       const barbell = expectOk(
-        await addVariant(db, profileId, exerciseId, { name: 'Barbell' }, now),
+        await renameVariant(
+          db,
+          profileId,
+          exerciseId,
+          (await defaultVariantOf(db, exerciseId)).id,
+          {
+            name: 'Barbell',
+          },
+        ),
       );
       const smith = expectOk(await addVariant(db, profileId, exerciseId, { name: 'Smith' }, later));
       const session = await open(program.workouts[0]?.id ?? '');
       return {
         slotId: slot?.id ?? '',
         exercise: slot?.exercise,
-        plainSlotId: program.workouts[0]?.slots[1]?.id ?? '',
         otherWorkoutSlotId: program.workouts[1]?.slots[0]?.id ?? '',
         barbell,
         smith,
@@ -434,14 +446,13 @@ describe('training', () => {
       };
     }
 
-    it('getSession gives each slot its selected variant, and none to an exercise without variants', async () => {
+    it('getSession gives each slot its selected variant', async () => {
       const { db } = testDatabase;
-      const { slotId, plainSlotId, barbell, session } = await variantSession();
+      const { slotId, barbell, session } = await variantSession();
 
       const view = expectOk(await getSession(db, profileId, session.id));
 
       expect(view.slots.find((slot) => slot.id === slotId)?.variant).toEqual(barbell);
-      expect(view.slots.find((slot) => slot.id === plainSlotId)?.variant).toBeNull();
     });
 
     it('getSessionSlotSettings lists the active variants oldest first, the selection and the block’s planned sets', async () => {
@@ -621,43 +632,6 @@ describe('training', () => {
       expect(logged.variantId).toBe(smith.id);
       const [updated] = await db.select().from(plannedSets).where(eq(plannedSets.id, target));
       expect(updated?.lastWeightGrams).toBe(30000);
-    });
-
-    it('logSet logs a set meant for no variant on a slot without variants', async () => {
-      const { db } = testDatabase;
-      const program = await activeProgram(fourWorkouts);
-      const session = await open(program.workouts[0]?.id ?? '');
-
-      const logged = expectOk(
-        await logSet(
-          db,
-          profileId,
-          session.id,
-          session.slots[0]?.plannedSets[0]?.id ?? '',
-          { reps: 10, weightKg: 50, expectedVariantId: null },
-          now,
-        ),
-      );
-
-      expect(logged.variantId).toBeNull();
-    });
-
-    it('logSet refuses a set meant for a variant on a slot without variants', async () => {
-      const { db } = testDatabase;
-      const program = await activeProgram(fourWorkouts);
-      const session = await open(program.workouts[0]?.id ?? '');
-
-      expect(
-        await logSet(
-          db,
-          profileId,
-          session.id,
-          session.slots[0]?.plannedSets[0]?.id ?? '',
-          { reps: 10, weightKg: 50, expectedVariantId: crypto.randomUUID() },
-          now,
-        ),
-      ).toEqual({ ok: false, error: 'variant-changed' });
-      expect(await db.select().from(setLogs).where(eq(setLogs.profileId, profileId))).toEqual([]);
     });
   });
 });

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { activateProgram } from '../activation';
 import { ensureProfile } from '../profile';
 import { openTestDatabase, type TestDatabase } from '../storage-test-database';
-import { createProgramFromSpec, expectOk } from '../storage-test-support';
+import { createProgramFromSpec, defaultVariantOf, expectOk } from '../storage-test-support';
 import { logSet, startWorkout } from '../training';
 import { addVariant } from '../variants';
 import { handlerContext, jsonOf } from './handler-test-support';
@@ -160,9 +160,7 @@ describe('variant handlers', () => {
 
     it('answers 409 last-variant when removing the only variant', async () => {
       const { exerciseId } = await squatProgram();
-      const variant = expectOk(
-        await addVariant(testDatabase.db, profileId, exerciseId, { name: 'Gym A' }, now),
-      );
+      const variant = await defaultVariantOf(testDatabase.db, exerciseId);
 
       const response = await remove(exerciseId, variant.id);
 

@@ -76,24 +76,7 @@ export async function addVariant(
     createdAt: now,
     removedAt: null,
   };
-  const statements: Statement[] = [db.insert(exerciseVariants).values(row)];
-  if (active.length === 0) {
-    statements.push(
-      db
-        .update(plannedSets)
-        .set({ variantId: row.id })
-        .where(
-          inArray(
-            plannedSets.exerciseSlotId,
-            db
-              .select({ id: exerciseSlots.id })
-              .from(exerciseSlots)
-              .where(eq(exerciseSlots.exerciseId, exerciseId)),
-          ),
-        ),
-    );
-  }
-  await runBatch(db, statements);
+  await db.insert(exerciseVariants).values(row);
   return succeed(toExerciseVariant(row));
 }
 

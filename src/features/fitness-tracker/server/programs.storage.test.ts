@@ -29,11 +29,12 @@ import { openTestDatabase, type TestDatabase } from './storage-test-database';
 import {
   activeOverview,
   createProgramFromSpec,
+  defaultVariantOf,
   expectOk,
   type ProgramSpec,
 } from './storage-test-support';
 import { finishWorkout, logSet, startWorkout } from './training';
-import { addVariant } from './variants';
+import { addVariant, renameVariant } from './variants';
 
 function targetsByBlock(program: Program, workoutIndex: number, slotIndex: number): number[][] {
   const slot = program.workouts[workoutIndex]?.slots[slotIndex];
@@ -402,12 +403,16 @@ describe('program structure', () => {
   }
 
   async function addVariants(exerciseId: string, names: readonly string[]): Promise<string[]> {
-    const ids: string[] = [];
-    for (const [index, name] of names.entries()) {
-      const createdAt = new Date(now.getTime() + index * 60_000);
-      ids.push(
-        expectOk(await addVariant(testDatabase.db, profileId, exerciseId, { name }, createdAt)).id,
-      );
+    const { db } = testDatabase;
+    const [first, ...rest] = names;
+    const defaultVariant = await defaultVariantOf(db, exerciseId);
+    expectOk(
+      await renameVariant(db, profileId, exerciseId, defaultVariant.id, { name: first ?? '' }),
+    );
+    const ids = [defaultVariant.id];
+    for (const [index, name] of rest.entries()) {
+      const createdAt = new Date(now.getTime() + (index + 1) * 60_000);
+      ids.push(expectOk(await addVariant(db, profileId, exerciseId, { name }, createdAt)).id);
     }
     return ids;
   }
@@ -426,7 +431,7 @@ describe('program structure', () => {
     expect(await parkedWeightsOfSlot(slotId)).toEqual([]);
   });
 
-  it('replacing a slot’s exercise selects the new exercise’s oldest active variant, or none, and drops all parked weights', async () => {
+  it('replacing a slot’s exercise selects the new exercise’s oldest active variant and drops all parked weights', async () => {
     const { db } = testDatabase;
     const [, dumbbellId] = await addVariants(inclineBenchId, ['Barbell', 'Dumbbell']);
     const { program } = await programWithOneSlot(2, [10, 10]);
@@ -447,7 +452,6 @@ describe('program structure', () => {
     );
     const pressId = expectOk(await addExercise(db, profileId, { name: 'Machine press' }, now)).id;
     const [plateLoadedId] = await addVariants(pressId, ['Plate loaded', 'Selectorized']);
-    const flyId = expectOk(await addExercise(db, profileId, { name: 'Fly' }, now)).id;
 
     expectOk(await replaceSlotExercise(db, profileId, slotId, { exerciseId: pressId }));
 
@@ -455,15 +459,6 @@ describe('program structure', () => {
     expect(replaced).toHaveLength(4);
     expect(
       replaced.every((row) => row.variantId === plateLoadedId && row.lastWeightGrams === null),
-    ).toBe(true);
-    expect(await parkedWeightsOfSlot(slotId)).toEqual([]);
-
-    expectOk(await replaceSlotExercise(db, profileId, slotId, { exerciseId: flyId }));
-
-    expect(
-      (await plannedSetsOfSlot(slotId)).every(
-        (row) => row.variantId === null && row.lastWeightGrams === null,
-      ),
     ).toBe(true);
     expect(await parkedWeightsOfSlot(slotId)).toEqual([]);
   });
