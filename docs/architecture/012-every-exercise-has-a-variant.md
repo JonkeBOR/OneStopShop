@@ -72,7 +72,10 @@ Each `RecordedVariant` carries `isRetired`, and a retired variant's choice reads
 
 - `planned_sets.variant_id` and `set_logs.variant_id` stay nullable. Making either NOT NULL needs a
   table rebuild, and rebuilding `set_logs` drops its immutability triggers.
-- `logSet` still accepts a null variant, which keeps a page opened before the deploy working.
+- `logSet` still accepts a null variant, but a session page opened before the deploy for a formerly
+  variant-less exercise sends `variantId: null` against a planned set that now carries `Default`.
+  `logSet` refuses that log with `variant-changed`, writes nothing, and the page refreshes, so the
+  next log works. That is one refusal after the deploy.
 - The null case of `fallbackVariantId` is unreachable, because an exercise always has an active
   variant to fall back to and the last one cannot be removed. It stays as a total function.
 - Between the CI migration step and the Worker deploy, the old Worker could still create an exercise

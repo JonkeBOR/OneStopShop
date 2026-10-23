@@ -40,7 +40,7 @@ function chartWith(overrides: Partial<ExerciseChart> = {}): ExerciseChart {
     range: '3m',
     domain: [0, 2],
     chips: [],
-    selectedParam: 'none',
+    selectedParam: 'v1',
     points: [
       { time: 0, kg: 100 },
       { time: 1, kg: 102.5 },
@@ -69,7 +69,7 @@ function usage(overrides: Partial<ExerciseUsage> = {}): ExerciseUsage {
     ],
     hasSetLogs: true,
     bodyParts: [{ bodyPart: 'chest', role: 'primary' }],
-    variants: [],
+    variants: [{ id: 'v1', name: 'Default' }],
     ...overrides,
   };
 }
@@ -127,10 +127,13 @@ describe('ExerciseEditScreen', () => {
     fetchMock.mockResolvedValue(Response.json({ error: 'name-taken' }, { status: 409 }));
     renderScreen();
 
-    fireEvent.change(screen.getByRole('textbox', { name: fitnessStrings.exerciseEdit.nameLabel }), {
-      target: { value: 'Chins' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: fitnessStrings.common.rename }));
+    const nameInput = screen.getByRole('textbox', { name: fitnessStrings.exerciseEdit.nameLabel });
+    fireEvent.change(nameInput, { target: { value: 'Chins' } });
+    const nameForm = nameInput.closest('form');
+    if (nameForm === null) {
+      throw new Error('The exercise name input is not in a form');
+    }
+    fireEvent.click(within(nameForm).getByRole('button', { name: fitnessStrings.common.rename }));
 
     await waitFor(() =>
       expect(screen.getByRole('alert').textContent).toBe(fitnessErrorStrings['name-taken']),

@@ -258,9 +258,14 @@ export function exerciseChart(input: ExerciseChartInput): ExerciseChart {
   const { metric, today, timeZone, range } = input;
   const start = rangeStartDate(today, range);
   const variantsById = new Map(input.variants.map((variant) => [variant.id, variant]));
-  const series = seriesFromLogs(input.setLogs, metric, timeZone, start)
-    .filter((candidate) => variantsById.has(candidate.param))
-    .toSorted((a, b) => lastTime(b) - lastTime(a));
+  const series = [];
+  for (const candidate of seriesFromLogs(input.setLogs, metric, timeZone, start)) {
+    const variant = variantsById.get(candidate.param);
+    if (variant !== undefined) {
+      series.push({ ...candidate, variant });
+    }
+  }
+  series.sort((a, b) => lastTime(b) - lastTime(a));
   const selected =
     series.find((candidate) => candidate.param === input.requestedVariant) ?? series[0];
   const points = selected?.points ?? [];
@@ -272,19 +277,12 @@ export function exerciseChart(input: ExerciseChartInput): ExerciseChart {
     chips:
       series.length < 2
         ? []
-        : series.flatMap((candidate) => {
-            const variant = variantsById.get(candidate.param);
-            return variant === undefined
-              ? []
-              : [
-                  {
-                    param: candidate.param,
-                    variantName: variant.name,
-                    isRetired: variant.isRetired,
-                    isSelected: candidate === selected,
-                  },
-                ];
-          }),
+        : series.map((candidate) => ({
+            param: candidate.param,
+            variantName: candidate.variant.name,
+            isRetired: candidate.variant.isRetired,
+            isSelected: candidate === selected,
+          })),
     selectedParam: selected?.param ?? null,
     points,
     bands,
