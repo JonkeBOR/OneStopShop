@@ -70,13 +70,16 @@ variant; variants can be renamed. Deleting a program is a soft delete: its row s
 tombstone with its name and `deleted_at`, its plan is removed, and every program operation treats
 it as not found. The home page has a bodyweight chart and the exercise page a chart with program
 bands of each session's heaviest weight, or of its best estimated 1RM, built with Recharts from
-`domain/progress-chart.ts`. See
+`domain/progress-chart.ts`. The finished screen shows a Gemini-written affirmation once per
+session, through the feature-agnostic client in `src/lib/server/gemini.ts`, and falls back to the
+fixed lines. See
 [006-domain-persistence.md](docs/architecture/006-domain-persistence.md),
 [007-cycle-as-container-and-bff.md](docs/architecture/007-cycle-as-container-and-bff.md),
 [008-weekly-volume-estimate.md](docs/architecture/008-weekly-volume-estimate.md),
 [009-exercise-variants.md](docs/architecture/009-exercise-variants.md),
-[011-progress-charts.md](docs/architecture/011-progress-charts.md) and
-[012-every-exercise-has-a-variant.md](docs/architecture/012-every-exercise-has-a-variant.md).
+[011-progress-charts.md](docs/architecture/011-progress-charts.md),
+[012-every-exercise-has-a-variant.md](docs/architecture/012-every-exercise-has-a-variant.md) and
+[013-ai-affirmations.md](docs/architecture/013-ai-affirmations.md).
 
 Deployment is continuous: `.github/workflows/deploy.yml` runs the gate, the remote D1 migrations
 and the OpenNext build and deploy on every push to `main`. Merging is deploying. There is no local
