@@ -65,6 +65,7 @@ export const fitnessStrings = {
     noVariant: 'No variant',
     legendLabel: 'Programs',
     deletedProgram: (name: string) => `${name} (deleted)`,
+    retiredVariant: (name: string) => `${name} (deleted)`,
     tooltip: (date: string, kg: string) => `${date} · ${kg} kg`,
     bodyweight: {
       heading: 'Bodyweight',
@@ -288,6 +289,7 @@ export const fitnessStrings = {
       firstConfirm:
         'The last weights already recorded for this exercise will move to this variant.',
       firstConfirmLabel: 'Move weights',
+      renameLabel: (name: string) => `Variant name, ${name}`,
       remove: (name: string) => `Remove ${name}`,
       removeConfirm: 'Last weights for this variant will be deleted.',
       removeLastConfirm:
