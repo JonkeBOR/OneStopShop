@@ -10,9 +10,10 @@ type RenameFormProps = {
   label: string;
   currentName: string;
   url: string;
+  isLabelHidden?: boolean;
 };
 
-export function RenameForm({ label, currentName, url }: RenameFormProps) {
+export function RenameForm({ label, currentName, url, isLabelHidden = false }: RenameFormProps) {
   const inputId = useId();
   const [name, setName] = useState(currentName);
   const action = useFitnessAction();
@@ -26,7 +27,7 @@ export function RenameForm({ label, currentName, url }: RenameFormProps) {
 
   return (
     <form className={styles.form} onSubmit={(event) => void submit(event)}>
-      <label className={styles.label} htmlFor={inputId}>
+      <label className={isLabelHidden ? styles.visuallyHidden : styles.label} htmlFor={inputId}>
         {label}
       </label>
       <div className={styles.fields}>

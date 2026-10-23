@@ -33,6 +33,20 @@ describe('RenameForm', () => {
     expect(input instanceof HTMLInputElement && input.value).toBe('Strength');
   });
 
+  it('keeps a hidden label naming the textbox', () => {
+    render(
+      <RenameForm
+        label="Variant name, Gym A"
+        currentName="Gym A"
+        url="/api/fitness/exercises/e1/variants/v1"
+        isLabelHidden
+      />,
+    );
+
+    expect(screen.getByRole('textbox', { name: 'Variant name, Gym A' })).toBeTruthy();
+    expect(screen.getByText('Variant name, Gym A').className).toMatch(/visuallyHidden/);
+  });
+
   it('sends the new name and refreshes', async () => {
     fetchMock.mockResolvedValue(Response.json({}));
     renderForm();

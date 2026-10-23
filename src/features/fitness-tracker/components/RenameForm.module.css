@@ -9,6 +9,15 @@
   font-size: var(--font-size-sm);
 }
 
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .fields {
   display: flex;
   gap: var(--space-2);

@@ -41,6 +41,13 @@ describe('VariantEditor', () => {
     expect(screen.getByRole('button', { name: copy.remove('Gym B') })).toBeTruthy();
   });
 
+  it('shows no visible label above a variant name and a trash icon to remove it', () => {
+    render(<VariantEditor exerciseId="e1" variants={variants} />);
+
+    expect(screen.queryByText(copy.renameLabel('Gym A'))?.className).toMatch(/visuallyHidden/);
+    expect(screen.getByRole('button', { name: copy.remove('Gym B') }).textContent).toBe('');
+  });
+
   it('deletes a variant after confirming', async () => {
     render(<VariantEditor exerciseId="e1" variants={variants} />);
 
