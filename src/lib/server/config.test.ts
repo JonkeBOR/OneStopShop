@@ -32,13 +32,22 @@ test('names every missing or empty variable without revealing any value', () => 
   expect(read).not.toThrow(/GOOGLE_CLIENT_SECRET/);
 });
 
-test('reads the Gemini key, trimmed', () => {
-  expect(readGeminiConfig({ GEMINI_API_KEY: '  gemini-key  ' })).toEqual({ apiKey: 'gemini-key' });
+test('reads the Gemini key, trimmed, when Gemini is enabled', () => {
+  expect(readGeminiConfig({ GEMINI_API_KEY: '  gemini-key  ', GEMINI_ENABLED: ' true ' })).toEqual({
+    apiKey: 'gemini-key',
+  });
 });
 
 test('has no Gemini config when the key is missing or blank', () => {
-  expect(readGeminiConfig({})).toBeNull();
-  expect(readGeminiConfig({ GEMINI_API_KEY: '   ' })).toBeNull();
+  expect(readGeminiConfig({ GEMINI_ENABLED: 'true' })).toBeNull();
+  expect(readGeminiConfig({ GEMINI_API_KEY: '   ', GEMINI_ENABLED: 'true' })).toBeNull();
+});
+
+test('has no Gemini config unless Gemini is explicitly enabled', () => {
+  expect(readGeminiConfig({ GEMINI_API_KEY: 'gemini-key' })).toBeNull();
+  expect(readGeminiConfig({ GEMINI_API_KEY: 'gemini-key', GEMINI_ENABLED: '' })).toBeNull();
+  expect(readGeminiConfig({ GEMINI_API_KEY: 'gemini-key', GEMINI_ENABLED: 'false' })).toBeNull();
+  expect(readGeminiConfig({ GEMINI_API_KEY: 'gemini-key', GEMINI_ENABLED: '1' })).toBeNull();
 });
 
 test('does not require the Gemini key for the rest of the configuration', () => {

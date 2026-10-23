@@ -256,8 +256,16 @@ describe('getGeminiGenerator', () => {
     expect(getGeminiGenerator()).toBeNull();
   });
 
-  test('has a generator with a key', () => {
+  test('has no generator with a key while Gemini is not enabled', () => {
     vi.stubEnv('GEMINI_API_KEY', 'k');
+    vi.stubEnv('GEMINI_ENABLED', '');
+
+    expect(getGeminiGenerator()).toBeNull();
+  });
+
+  test('has a generator with a key when Gemini is enabled', () => {
+    vi.stubEnv('GEMINI_API_KEY', 'k');
+    vi.stubEnv('GEMINI_ENABLED', 'true');
 
     expect(getGeminiGenerator()).toBeTypeOf('function');
   });

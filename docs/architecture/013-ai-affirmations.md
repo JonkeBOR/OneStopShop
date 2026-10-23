@@ -29,7 +29,11 @@ Principle IV of the constitution.
 `GEMINI_API_KEY` is configured like `GOOGLE_CLIENT_SECRET`: `.env.local` and `.dev.vars` locally, a
 Worker secret in production, never in `wrangler.jsonc` `vars`, never `NEXT_PUBLIC_`, never in CI.
 Only `src/lib/server/config.ts` reads it, through the optional `readGeminiConfig`, so a missing key
-means fixed lines and does not break sign-in, CI or the end-to-end tests. The key travels in the
+means fixed lines and does not break sign-in, CI or the end-to-end tests. A key alone is not
+enough: `readGeminiConfig` also needs `GEMINI_ENABLED=true`, set in `wrangler.jsonc` `vars` for the
+deployed Worker and set to `false` in `.env.local` and `.dev.vars`, so a key kept in `.env.local` or
+`.dev.vars` for ad hoc testing never sends a live request from a local run unless the switch is
+set there by hand. The key travels in the
 `x-goog-api-key` header, never in the URL, and is never logged.
 
 ### Three layers

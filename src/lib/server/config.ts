@@ -32,8 +32,9 @@ export function readConfig(env: Environment): Config {
 }
 
 export function readGeminiConfig(env: Environment): GeminiConfig | null {
+  const isEnabled = env.GEMINI_ENABLED?.trim() === 'true';
   const apiKey = env.GEMINI_API_KEY?.trim();
-  return apiKey ? { apiKey } : null;
+  return isEnabled && apiKey ? { apiKey } : null;
 }
 
 export function getConfig(): Config {
