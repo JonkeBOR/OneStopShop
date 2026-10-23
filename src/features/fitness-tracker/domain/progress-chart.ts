@@ -57,8 +57,8 @@ export function bodyweightChart(
   const kept = entries
     .filter((entry) => start === null || entry.date >= start)
     .toSorted((a, b) => a.date.localeCompare(b.date));
-  const domainStart = start ?? kept[0]?.date ?? today;
-  const domainEnd = start === null ? (kept[kept.length - 1]?.date ?? today) : today;
+  const domainStart = kept[0]?.date ?? today;
+  const domainEnd = kept[kept.length - 1]?.date ?? today;
   return {
     range,
     domain: [dayStart(domainStart), dayStart(domainEnd) + DAY_MS],
@@ -241,7 +241,7 @@ function legendFromBands(bands: readonly ProgramBand[]): LegendEntry[] {
   return [...legend.values()];
 }
 
-function allTimeDomain(
+function dataDomain(
   points: readonly ChartPoint[],
   bands: readonly ProgramBand[],
   today: string,
@@ -269,10 +269,7 @@ export function exerciseChart(input: ExerciseChartInput): ExerciseChart {
   return {
     metric,
     range,
-    domain:
-      start === null
-        ? allTimeDomain(points, bands, today)
-        : [dayStart(start), dayStart(today) + DAY_MS],
+    domain: dataDomain(points, bands, today),
     chips:
       series.length < 2
         ? []

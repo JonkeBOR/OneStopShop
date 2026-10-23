@@ -62,9 +62,7 @@ describe('time axis', () => {
   });
 
   it('leaves the year off ticks for a domain of a year or less', () => {
-    const threeMonths = bodyweightChart([], '2026-10-21', '3m').domain;
-    const oneYear = bodyweightChart([], '2026-10-21', '1y').domain;
-    expect(tickFormatterFor(threeMonths)(chartTime('2026-10-21'))).toBe('21 Oct');
+    const oneYear: [number, number] = [dayStart('2025-10-21'), dayStart('2026-10-21') + DAY];
     expect(tickFormatterFor(oneYear)(chartTime('2026-10-21'))).toBe('21 Oct');
   });
 
@@ -73,8 +71,8 @@ describe('time axis', () => {
     expect(tickFormatterFor(domain)(chartTime('2025-03-05'))).toBe('5 Mar 2025');
   });
 
-  it('spreads five ticks evenly over whole days from the range start to today', () => {
-    const domain = bodyweightChart([], '2026-10-21', '3m').domain;
+  it('spreads five ticks evenly over whole days of the domain', () => {
+    const domain: [number, number] = [dayStart('2026-07-21'), dayStart('2026-10-21') + DAY];
     expect(axisTicks(domain)).toEqual([
       chartTime('2026-07-21'),
       chartTime('2026-08-13'),
@@ -110,7 +108,17 @@ describe('bodyweightChart', () => {
       { time: chartTime('2026-07-21'), kg: 81 },
       { time: chartTime('2026-10-01'), kg: 80 },
     ]);
-    expect(chart.domain).toEqual([dayStart('2026-07-21'), dayStart('2026-10-21') + DAY]);
+  });
+
+  it('runs a range from its first kept entry to its last', () => {
+    expect(bodyweightChart(entries, '2026-10-21', '3m').domain).toEqual([
+      dayStart('2026-07-21'),
+      dayStart('2026-10-01') + DAY,
+    ]);
+    expect(bodyweightChart(entries, '2026-10-21', '1y').domain).toEqual([
+      dayStart('2026-07-20'),
+      dayStart('2026-10-01') + DAY,
+    ]);
   });
 
   it('runs everything from the first entry to the last', () => {
@@ -119,12 +127,16 @@ describe('bodyweightChart', () => {
     expect(chart.domain).toEqual([dayStart('2026-07-20'), dayStart('2026-10-01') + DAY]);
   });
 
-  it('starts everything at today when there are no entries', () => {
+  it('shows today alone when no entries are kept', () => {
     expect(bodyweightChart([], '2026-10-21', 'all')).toEqual({
       range: 'all',
       domain: [dayStart('2026-10-21'), dayStart('2026-10-21') + DAY],
       points: [],
     });
+    expect(bodyweightChart(entries, '2027-06-01', '3m').domain).toEqual([
+      dayStart('2027-06-01'),
+      dayStart('2027-06-01') + DAY,
+    ]);
   });
 });
 
@@ -393,5 +405,27 @@ describe('exerciseChart program bands', () => {
     expect(bandsOnly.domain).toEqual([dayStart('2026-06-01'), dayStart('2026-09-01') + DAY]);
     const empty = chartFor([], { range: 'all' });
     expect(empty.domain).toEqual([dayStart('2026-10-21'), dayStart('2026-10-21') + DAY]);
+  });
+
+  it('runs a range from the earliest to the latest of its kept points and clipped bands', () => {
+    const chart = chartFor([setLog({ day: '2026-09-15', reps: 5, weightKg: 80 })], {
+      range: '3m',
+      sessions,
+    });
+    expect(chart.domain).toEqual([dayStart('2026-07-21'), dayStart('2026-09-15') + DAY]);
+    const pointsOnly = chartFor(
+      [
+        setLog({ day: '2025-01-01', reps: 5, weightKg: 80 }),
+        setLog({ day: '2026-09-10', reps: 5, weightKg: 80 }),
+        setLog({ day: '2026-10-01', reps: 5, weightKg: 80 }),
+      ],
+      { range: '1y' },
+    );
+    expect(pointsOnly.domain).toEqual([dayStart('2026-09-10'), dayStart('2026-10-01') + DAY]);
+    const nothingKept = chartFor([setLog({ day: '2025-01-01', reps: 5, weightKg: 80 })], {
+      range: '3m',
+      sessions: [session('A', '2026-01-01')],
+    });
+    expect(nothingKept.domain).toEqual([dayStart('2026-10-21'), dayStart('2026-10-21') + DAY]);
   });
 });
