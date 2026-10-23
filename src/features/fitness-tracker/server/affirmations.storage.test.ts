@@ -1,11 +1,12 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { GenerateJson } from '@/lib/server/gemini';
 import { dailyAffirmationCap } from '../domain/affirmation';
 import { activateProgram } from './activation';
-import { claimAffirmation, readAffirmation, saveAffirmation } from './affirmations';
+import { affirmationFor, claimAffirmation, readAffirmation, saveAffirmation } from './affirmations';
 import { ensureProfile } from './profile';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
 import { activeOverview, createProgramFromSpec, expectOk } from './storage-test-support';
-import { finishWorkout, startWorkout } from './training';
+import { finishWorkout, getSession, startWorkout } from './training';
 
 describe('affirmations', () => {
   let testDatabase: TestDatabase;
@@ -126,5 +127,76 @@ describe('affirmations', () => {
     await saveAffirmation(db, otherProfileId, sessionId, 'Not yours.');
 
     expect(await readAffirmation(db, profileId, sessionId)).toBeNull();
+  });
+
+  async function finishedSession(at: Date) {
+    const sessionId = await finishedSessionId(at);
+    return expectOk(await getSession(testDatabase.db, profileId, sessionId));
+  }
+
+  describe('affirmationFor', () => {
+    it('writes, saves and returns an affirmation once', async () => {
+      const { db } = testDatabase;
+      const session = await finishedSession(now);
+      const generate = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
+
+      expect(await affirmationFor(db, profileId, session, now, generate)).toBe('Huge.');
+      expect(await affirmationFor(db, profileId, session, now, generate)).toBe('Huge.');
+
+      expect(generate).toHaveBeenCalledTimes(1);
+      expect(await readAffirmation(db, profileId, session.id)).toBe('Huge.');
+    });
+
+    it('does not claim or call anything without a generator', async () => {
+      const { db } = testDatabase;
+      const session = await finishedSession(now);
+      const generate = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
+
+      expect(await affirmationFor(db, profileId, session, now, null)).toBeNull();
+      expect(await affirmationFor(db, profileId, session, now, generate)).toBe('Huge.');
+      expect(generate).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not retry after a failed answer', async () => {
+      const { db } = testDatabase;
+      const session = await finishedSession(now);
+      const failing = vi.fn<GenerateJson>().mockResolvedValue(null);
+      const succeeding = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
+
+      expect(await affirmationFor(db, profileId, session, now, failing)).toBeNull();
+      expect(await affirmationFor(db, profileId, session, now, succeeding)).toBeNull();
+      expect(succeeding).not.toHaveBeenCalled();
+    });
+
+    it('loses to a render that already claimed', async () => {
+      const { db } = testDatabase;
+      const session = await finishedSession(now);
+      const generate = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
+      await claimAffirmation(db, profileId, session.id, now);
+
+      expect(await affirmationFor(db, profileId, session, now, generate)).toBeNull();
+      expect(generate).not.toHaveBeenCalled();
+    });
+
+    it('shows a stored affirmation without a generator', async () => {
+      const { db } = testDatabase;
+      const session = await finishedSession(now);
+      await saveAffirmation(db, profileId, session.id, 'Kept.');
+
+      expect(await affirmationFor(db, profileId, session, now, null)).toBe('Kept.');
+    });
+
+    it('sends no ids or dates to the generator', async () => {
+      const { db } = testDatabase;
+      const session = await finishedSession(now);
+      const generate = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
+
+      await affirmationFor(db, profileId, session, now, generate);
+
+      const userMessage = generate.mock.calls[0]?.[0].userMessage ?? '';
+      expect(userMessage).not.toContain(session.id);
+      expect(userMessage).not.toContain(profileId);
+      expect(userMessage).not.toContain('2026');
+    });
   });
 });
