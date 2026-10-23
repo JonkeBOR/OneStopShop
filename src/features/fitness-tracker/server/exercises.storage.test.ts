@@ -13,7 +13,7 @@ import { exerciseSlots, exerciseVariants } from './schema';
 import { createProgramFromSpec, defaultVariantOf, expectOk } from './storage-test-support';
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
 import { logSet, startWorkout } from './training';
-import { addVariant, listActiveVariants, renameVariant } from './variants';
+import { addVariant, listActiveVariants, removeVariant, renameVariant } from './variants';
 
 describe('exercise catalog', () => {
   let testDatabase: TestDatabase;
@@ -291,6 +291,10 @@ describe('exercise usage', () => {
         new Date(now.getTime() + 1000),
       ),
     );
+    const old = expectOk(
+      await addVariant(db, profileId, exercise.id, { name: 'Old' }, new Date(now.getTime() + 500)),
+    );
+    expectOk(await removeVariant(db, profileId, exercise.id, old.id, now));
 
     const usage = expectOk(await getExerciseUsage(db, profileId, exercise.id));
 
