@@ -1,6 +1,8 @@
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { fail } from '../domain/result';
 import type { Program } from '../domain/types';
+import { maxNameLength } from '../domain/values';
 import { activateProgram } from './activation';
 import { runBatch } from './batch';
 import { ensureProfile } from './profile';
@@ -12,6 +14,7 @@ import {
   addVariant,
   listActiveVariants,
   removeVariant,
+  renameVariant,
   swapVariantStatements,
   switchSlotVariant,
 } from './variants';
@@ -210,12 +213,13 @@ describe('exercise variants', () => {
     const squatId = exerciseIdOf(program, 'Squat');
     const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
     await logSetWith(program, barbell.id);
+    expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
     expectOk(await removeVariant(db, profileId, squatId, barbell.id, later));
 
     const again = expectOk(await addVariant(db, profileId, squatId, { name: 'barbell' }, latest));
 
     expect(again.id).not.toBe(barbell.id);
-    expect(await activeNames(squatId)).toEqual(['barbell']);
+    expect(await activeNames(squatId)).toEqual(['Smith', 'barbell']);
   });
 
   it('removing a variant with logged sets retires it and hides it from listActiveVariants', async () => {
@@ -285,29 +289,83 @@ describe('exercise variants', () => {
     expect(parked).toHaveLength(squatSets.length);
   });
 
-  it('removing the last variant leaves the slot without a variant or weights, and the next add transfers again', async () => {
+  it('refuses to remove the only active variant, even beside a retired one, and changes nothing', async () => {
     const { db } = testDatabase;
     const program = await squatProgram();
     const squatId = exerciseIdOf(program, 'Squat');
     const squatSets = plannedSetIdsOf(program, 'Squat');
     const barbell = expectOk(await addVariant(db, profileId, squatId, { name: 'Barbell' }, now));
-    await setWeights(squatSets, 40000);
-
+    await logSetWith(program, barbell.id);
+    const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, later));
     expectOk(await removeVariant(db, profileId, squatId, barbell.id, later));
 
+    expect(await removeVariant(db, profileId, squatId, smith.id, latest)).toEqual(
+      fail('last-variant'),
+    );
+
+    expect(await activeNames(squatId)).toEqual(['Smith']);
+    expect((await plannedSetRows(squatSets)).every((row) => row.variantId === smith.id)).toBe(true);
+  });
+
+  it('renames a variant and refuses a name another active variant has, ignoring case', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    expectOk(await addVariant(db, profileId, squatId, { name: 'Gym A' }, now));
+    const gymB = expectOk(await addVariant(db, profileId, squatId, { name: 'Gym B' }, later));
+
+    const renamed = expectOk(
+      await renameVariant(db, profileId, squatId, gymB.id, { name: ' Gym C ' }),
+    );
+
+    expect(renamed).toEqual({ id: gymB.id, name: 'Gym C' });
+    expect(await activeNames(squatId)).toEqual(['Gym A', 'Gym C']);
+    expect(await renameVariant(db, profileId, squatId, gymB.id, { name: 'gym a' })).toEqual(
+      fail('name-taken'),
+    );
+    expect(await activeNames(squatId)).toEqual(['Gym A', 'Gym C']);
+  });
+
+  it('renaming allows a change of case and a retired variant’s name', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    const gymA = expectOk(await addVariant(db, profileId, squatId, { name: 'Gym A' }, now));
+    const old = expectOk(await addVariant(db, profileId, squatId, { name: 'Old' }, later));
+    await logSetWith(program, old.id);
+    expectOk(await removeVariant(db, profileId, squatId, old.id, later));
+
+    expectOk(await renameVariant(db, profileId, squatId, gymA.id, { name: 'GYM A' }));
+    expect(await activeNames(squatId)).toEqual(['GYM A']);
+    expectOk(await renameVariant(db, profileId, squatId, gymA.id, { name: 'Old' }));
+    expect(await activeNames(squatId)).toEqual(['Old']);
+  });
+
+  it('renaming refuses empty, too long, a retired variant and another profile’s variant', async () => {
+    const { db } = testDatabase;
+    const program = await squatProgram();
+    const squatId = exerciseIdOf(program, 'Squat');
+    const gymA = expectOk(await addVariant(db, profileId, squatId, { name: 'Gym A' }, now));
+    const old = expectOk(await addVariant(db, profileId, squatId, { name: 'Old' }, later));
+    await logSetWith(program, old.id);
+    expectOk(await removeVariant(db, profileId, squatId, old.id, later));
+    const otherProfileId = (await ensureProfile(db, crypto.randomUUID(), now)).id;
+
+    expect(await renameVariant(db, profileId, squatId, gymA.id, { name: '' })).toEqual(
+      fail('name-required'),
+    );
     expect(
-      (await plannedSetRows(squatSets)).every(
-        (row) => row.variantId === null && row.lastWeightGrams === null,
-      ),
-    ).toBe(true);
-    expect(await activeNames(squatId)).toEqual([]);
-
-    await setWeights(squatSets.slice(0, 1), 50000);
-    const smith = expectOk(await addVariant(db, profileId, squatId, { name: 'Smith' }, latest));
-
-    const rows = await plannedSetRows(squatSets);
-    expect(rows.every((row) => row.variantId === smith.id)).toBe(true);
-    expect(rows.find((row) => row.id === squatSets[0])?.lastWeightGrams).toBe(50000);
+      await renameVariant(db, profileId, squatId, gymA.id, {
+        name: 'x'.repeat(maxNameLength + 1),
+      }),
+    ).toEqual(fail('name-too-long'));
+    expect(await renameVariant(db, profileId, squatId, old.id, { name: 'New' })).toEqual(
+      fail('not-found'),
+    );
+    expect(await renameVariant(db, otherProfileId, squatId, gymA.id, { name: 'New' })).toEqual(
+      fail('not-found'),
+    );
+    expect(await activeNames(squatId)).toEqual(['Gym A']);
   });
 
   it('another profile’s exercise or variant is not-found and nothing changes', async () => {

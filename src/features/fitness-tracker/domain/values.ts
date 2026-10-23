@@ -3,7 +3,7 @@ import { fail, type Result, succeed } from './result';
 const gramsPerKilogram = 1000;
 const maxWeightGrams = 1000 * gramsPerKilogram;
 const maxReps = 999;
-const maxNameLength = 100;
+export const maxNameLength = 100;
 const gramRoundingTolerance = 1e-6;
 
 export function parseWeightKg(kilograms: number): Result<number, 'invalid-weight'> {

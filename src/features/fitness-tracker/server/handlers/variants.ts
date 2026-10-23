@@ -1,7 +1,7 @@
 import 'server-only';
 import type { FitnessRequestContext } from '../fitness-route';
 import { readJson, readString, respond, respondEmpty } from '../http';
-import { addVariant, removeVariant, switchSlotVariant } from '../variants';
+import { addVariant, removeVariant, renameVariant, switchSlotVariant } from '../variants';
 
 export async function handleAddVariant({
   db,
@@ -19,6 +19,27 @@ export async function handleAddVariant({
     return respond(name);
   }
   return respond(await addVariant(db, profileId, params.id ?? '', { name: name.value }, now));
+}
+
+export async function handleRenameVariant({
+  db,
+  profileId,
+  request,
+  params,
+}: FitnessRequestContext): Promise<Response> {
+  const body = await readJson(request);
+  if (!body.ok) {
+    return respond(body);
+  }
+  const name = readString(body.value, 'name');
+  if (!name.ok) {
+    return respond(name);
+  }
+  return respond(
+    await renameVariant(db, profileId, params.id ?? '', params.variantId ?? '', {
+      name: name.value,
+    }),
+  );
 }
 
 export async function handleRemoveVariant({

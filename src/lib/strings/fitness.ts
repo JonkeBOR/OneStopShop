@@ -347,4 +347,5 @@ export const fitnessErrorStrings: Record<FitnessErrorCode, string> = {
   'variant-locked':
     'A set is already logged for this exercise, so its variant cannot be changed in this workout.',
   'variant-changed': 'This exercise was switched to another variant. The page has been refreshed.',
+  'last-variant': 'An exercise needs at least one variant.',
 };

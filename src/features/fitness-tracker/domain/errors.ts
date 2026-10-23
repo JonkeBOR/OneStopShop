@@ -31,6 +31,7 @@ export const fitnessErrorCodes = [
   'set-already-logged',
   'variant-locked',
   'variant-changed',
+  'last-variant',
 ] as const;
 
 export type FitnessErrorCode = (typeof fitnessErrorCodes)[number];

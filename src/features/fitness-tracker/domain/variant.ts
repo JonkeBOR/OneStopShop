@@ -1,6 +1,8 @@
 import { fail, type Result, succeed } from './result';
 import type { SessionStatus } from './types';
 
+export const defaultVariantName = 'Default';
+
 export type ParkedWeight = { variantId: string; lastWeightGrams: number };
 
 export type VariantSwitchDecision = { kind: 'switch' } | { kind: 'unchanged' };
@@ -34,6 +36,13 @@ export function fallbackVariantId(
   return activeIdsOldestFirst.find((id) => id !== removedId) ?? null;
 }
 
-export function removalOf(hasSetLogs: boolean): 'retire' | 'delete' {
-  return hasSetLogs ? 'retire' : 'delete';
+export function decideVariantRemoval(input: {
+  activeVariantIds: readonly string[];
+  variantId: string;
+  hasSetLogs: boolean;
+}): Result<'retire' | 'delete', 'last-variant'> {
+  if (fallbackVariantId(input.activeVariantIds, input.variantId) === null) {
+    return fail('last-variant');
+  }
+  return succeed(input.hasSetLogs ? 'retire' : 'delete');
 }
