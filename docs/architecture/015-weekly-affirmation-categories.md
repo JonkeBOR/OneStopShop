@@ -133,8 +133,9 @@ A bad week costs at most 3 requests a day.
   Worker's secret is set. Until then the page shows fixed lines.
 - Every user sees the same 42 lines in a week. The category and the week position decide which one.
 - Migration 0013 only adds the `affirmations` table. The 013 columns
-  `workout_sessions.affirmation` and `affirmation_requested_at` stay in the schema, unread, for one
-  deploy. CI applies migrations before the new app Worker is live, and the old app's Drizzle
+  `workout_sessions.affirmation` and `affirmation_requested_at` stayed in the schema, unread, for
+  one deploy, and a separate deploy then took them out of the schema while they stayed in the
+  database. CI applies migrations before the new app Worker is live, and the old app's Drizzle
   queries name every column. Dropping them in 0013 would have broken every session page for the
   length of the deploy, and for longer if the deploy step failed. A follow-up migration drops them
-  once this decision is live in production.
+  once the schema without them is live in production.

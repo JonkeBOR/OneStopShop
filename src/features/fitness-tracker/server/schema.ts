@@ -192,8 +192,6 @@ export const workoutSessions = sqliteTable(
     status: text('status', { enum: sessionStatuses }).notNull(),
     startedAt: integer('started_at', { mode: 'timestamp_ms' }).notNull(),
     finishedAt: integer('finished_at', { mode: 'timestamp_ms' }),
-    affirmation: text('affirmation'),
-    affirmationRequestedAt: integer('affirmation_requested_at', { mode: 'timestamp_ms' }),
   },
   (table) => [
     uniqueIndex('workout_sessions_cycle_pass_block_workout').on(
