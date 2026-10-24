@@ -27,5 +27,6 @@
   "vars": {
     "GOOGLE_CLIENT_ID": "598266239301-g3q2rnvvqg31kldgulglp3fp80gkmi6i.apps.googleusercontent.com",
     "OWNER_EMAIL": "jonknu92@gmail.com",
+    "GEMINI_ENABLED": "true",
   },
 }

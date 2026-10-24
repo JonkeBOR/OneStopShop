@@ -1,9 +1,10 @@
+import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
 import { parseCompletedBlock } from '@/features/fitness-tracker/domain/values';
 import { requireFitnessContext } from '@/features/fitness-tracker/server/page-context';
 import { readTimeZone } from '@/features/fitness-tracker/server/time-zone';
 import { getSession, getTrainingOverview } from '@/features/fitness-tracker/server/training';
-import { fitnessStrings } from '@/lib/strings/fitness';
+import { SessionAffirmation } from './SessionAffirmation';
 import { WorkoutFinishedScreen } from './WorkoutFinishedScreen';
 
 type WorkoutFinishedPageProps = {
@@ -11,18 +12,13 @@ type WorkoutFinishedPageProps = {
   searchParams: Promise<{ completed?: string }>;
 };
 
-function randomAffirmation(): string {
-  const { affirmations } = fitnessStrings.finished;
-  return affirmations[Math.floor(Math.random() * affirmations.length)] ?? affirmations[0];
-}
-
 export default async function WorkoutFinishedPage({
   params,
   searchParams,
 }: WorkoutFinishedPageProps) {
   const { sessionId } = await params;
   const { completed } = await searchParams;
-  const { db, profileId } = await requireFitnessContext(
+  const { db, profileId, now } = await requireFitnessContext(
     `/fitness-tracker/active/sessions/${sessionId}/finished`,
   );
   const session = await getSession(db, profileId, sessionId);
@@ -39,7 +35,11 @@ export default async function WorkoutFinishedPage({
   const completedBlock = parseCompletedBlock(completed);
   return (
     <WorkoutFinishedScreen
-      affirmation={randomAffirmation()}
+      affirmation={
+        <Suspense fallback={null}>
+          <SessionAffirmation db={db} profileId={profileId} session={session.value} now={now} />
+        </Suspense>
+      }
       workoutName={session.value.workout.name}
       overview={overview}
       completedBlock={completedBlock}

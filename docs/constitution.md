@@ -78,7 +78,9 @@ Testing: **Vitest** for unit tests and **Playwright** (mobile WebKit) for end-to
 **Playwright MCP** browser for exploratory checks, as recorded in
 `docs/architecture/002-testing-strategy.md`. Charting: **Recharts**, rendered only in small Client
 Components that take server-built props, as recorded in `docs/architecture/011-progress-charts.md`.
-Google Sheets and the Google Sheets API are not part of the stack. Any change to this stack is a
+AI text: the **Gemini Developer API** free tier, called only from the server through
+`src/lib/server/gemini.ts`, as recorded in `docs/architecture/013-ai-affirmations.md`; never a paid
+tier. Google Sheets and the Google Sheets API are not part of the stack. Any change to this stack is a
 deliberate architectural decision and MUST be reflected here and in `docs/architecture/`.
 
 ## Incremental Decisions
@@ -121,4 +123,4 @@ Every change MUST be checked against these principles; any deviation MUST be jus
 and the architecture decisions under `docs/architecture/` for detailed runtime/architecture
 guidance that supplements, but does not override, this constitution.
 
-**Version**: 2.3.0 | **Ratified**: 2026-09-09 | **Last Amended**: 2026-10-21
+**Version**: 2.4.0 | **Ratified**: 2026-09-09 | **Last Amended**: 2026-10-23
