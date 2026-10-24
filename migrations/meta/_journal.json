@@ -92,6 +92,13 @@
       "when": 1792791307691,
       "tag": "0012_session_affirmations",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1792842463441,
+      "tag": "0013_affirmation_categories",
+      "breakpoints": true
     }
   ]
 }

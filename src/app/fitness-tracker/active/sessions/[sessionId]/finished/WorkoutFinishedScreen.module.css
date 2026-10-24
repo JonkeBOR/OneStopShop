@@ -64,7 +64,6 @@
 
 .title {
   margin: 0;
-  min-block-size: 1lh;
   font-size: var(--font-size-xl);
   text-align: center;
 }
