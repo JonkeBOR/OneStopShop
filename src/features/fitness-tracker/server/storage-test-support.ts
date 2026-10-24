@@ -1,3 +1,9 @@
+import {
+  affirmationCategories,
+  affirmationsPerCategory,
+  type AffirmationCategory,
+  type AffirmationSet,
+} from '../domain/affirmation';
 import type { Result } from '../domain/result';
 import type { ExerciseVariant, Program, TrainingOverview } from '../domain/types';
 import type { Database } from '@/lib/server/database';
@@ -115,4 +121,16 @@ export async function rejectionOf(run: () => Promise<unknown>): Promise<unknown>
     return error;
   }
   return undefined;
+}
+
+export function affirmationSetOf(label: string): AffirmationSet {
+  return Object.fromEntries(
+    affirmationCategories.map((category) => [
+      category,
+      Array.from(
+        { length: affirmationsPerCategory },
+        (_, index) => `${label} ${category} ${index}`,
+      ),
+    ]),
+  ) as Record<AffirmationCategory, string[]>;
 }

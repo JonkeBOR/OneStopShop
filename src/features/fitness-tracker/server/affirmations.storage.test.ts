@@ -5,7 +5,12 @@ import type { Database } from '@/lib/server/database';
 import type { AffirmationCategory } from '../domain/affirmation';
 import type { Program, SessionView } from '../domain/types';
 import { activateProgram } from './activation';
-import { finishedSessionAffirmation, readAffirmations } from './affirmations';
+import {
+  finishedSessionAffirmation,
+  readAffirmations,
+  readAffirmationSetGeneratedAt,
+  replaceAffirmationSet,
+} from './affirmations';
 import { ensureProfile } from './profile';
 import { affirmations } from './schema';
 import {
@@ -13,7 +18,12 @@ import {
   openTestDatabase,
   type TestDatabase,
 } from './storage-test-database';
-import { createProgramFromSpec, expectOk, type ProgramSpec } from './storage-test-support';
+import {
+  affirmationSetOf,
+  createProgramFromSpec,
+  expectOk,
+  type ProgramSpec,
+} from './storage-test-support';
 import { finishWorkout, getSession, logSet, startWorkout } from './training';
 
 const statementBreakpoint = '--> statement-breakpoint';
@@ -134,6 +144,45 @@ describe('affirmations', () => {
     const session = await finishCompleted(0);
 
     expect(await finishedSessionAffirmation(db, profileId, session)).toBeNull();
+  });
+});
+
+describe('replacing the affirmation set', () => {
+  let testDatabase: TestDatabase;
+
+  beforeAll(async () => {
+    testDatabase = await openTestDatabase();
+  });
+
+  afterAll(async () => {
+    await testDatabase.dispose();
+  });
+
+  beforeEach(async () => {
+    await testDatabase.db.delete(affirmations);
+  });
+
+  it('has no generated time when the table is empty', async () => {
+    expect(await readAffirmationSetGeneratedAt(testDatabase.db)).toBeNull();
+  });
+
+  it('replaces a full 6×7 set in one batch', async () => {
+    const { db } = testDatabase;
+    const generatedAt = new Date('2026-10-26T03:00:00Z');
+    await replaceAffirmationSet(db, affirmationSetOf('old'), new Date('2026-10-19T03:00:00Z'));
+
+    await replaceAffirmationSet(db, affirmationSetOf('new'), generatedAt);
+
+    const rows = await db.select().from(affirmations);
+    expect(rows).toHaveLength(42);
+    expect(new Set(rows.map((row) => row.generatedAt.getTime()))).toEqual(
+      new Set([generatedAt.getTime()]),
+    );
+    expect(rows.every((row) => row.text.startsWith('new '))).toBe(true);
+    expect(await readAffirmations(db, 'skipped-sets')).toEqual(
+      affirmationSetOf('new')['skipped-sets'],
+    );
+    expect(await readAffirmationSetGeneratedAt(db)).toEqual(generatedAt);
   });
 });
 
