@@ -18,7 +18,8 @@ without the overhead of production-grade infrastructure a personal single-user a
 The React client (browser/PWA) MUST NOT communicate directly with the database or any other
 persistence backend. All data access goes through the Next.js server acting as a
 Backend-for-Frontend (BFF), exposed to the client as application-specific endpoints rather than
-raw storage-provider calls. The client reasons about application data, never about the shape of a
+raw storage-provider calls. D1 is reached only through a Worker's binding: the app Worker's, or the
+jobs Worker's for scheduled jobs. The client reasons about application data, never about the shape of a
 storage provider's API.
 
 **Rationale**: Keeps storage access and provider-specific logic server-side, and allows the
@@ -47,7 +48,9 @@ technical reason requires otherwise. The app does not need high availability, au
 enterprise infrastructure, paid databases, or dedicated servers, and MUST NOT take on such
 dependencies by default. The chosen platform, Cloudflare Workers with D1, MUST be used within its free
 tier; paid add-ons require a concrete need recorded in `docs/architecture/`. The app deploys as a
-single Worker serving both pages and server — no separate frontend and backend hosting.
+single Worker serving both pages and server — no separate frontend and backend hosting. Scheduled
+jobs run in one separate jobs Worker with no HTTP surface, also on the free plan, as recorded in
+`docs/architecture/014-scheduled-jobs.md`.
 
 **Rationale**: This is a personal, low-traffic application; ongoing cost and operational overhead
 must stay proportionate to that reality.
@@ -78,9 +81,10 @@ Testing: **Vitest** for unit tests and **Playwright** (mobile WebKit) for end-to
 **Playwright MCP** browser for exploratory checks, as recorded in
 `docs/architecture/002-testing-strategy.md`. Charting: **Recharts**, rendered only in small Client
 Components that take server-built props, as recorded in `docs/architecture/011-progress-charts.md`.
-AI text: the **Gemini Developer API** free tier, called only from the server through
-`src/lib/server/gemini.ts`, as recorded in `docs/architecture/013-ai-affirmations.md`; never a paid
-tier. Google Sheets and the Google Sheets API are not part of the stack. Any change to this stack is a
+Scheduled work: **Cloudflare Cron Triggers** on the jobs Worker in `jobs/`, as recorded in
+`docs/architecture/014-scheduled-jobs.md`. AI text: the **Gemini Developer API** free tier, called
+only from the jobs Worker through `src/lib/gemini/client.ts`, as recorded in
+`docs/architecture/015-weekly-affirmation-categories.md`; never a paid tier. Google Sheets and the Google Sheets API are not part of the stack. Any change to this stack is a
 deliberate architectural decision and MUST be reflected here and in `docs/architecture/`.
 
 ## Incremental Decisions
@@ -123,4 +127,4 @@ Every change MUST be checked against these principles; any deviation MUST be jus
 and the architecture decisions under `docs/architecture/` for detailed runtime/architecture
 guidance that supplements, but does not override, this constitution.
 
-**Version**: 2.4.0 | **Ratified**: 2026-09-09 | **Last Amended**: 2026-10-23
+**Version**: 2.5.0 | **Ratified**: 2026-09-09 | **Last Amended**: 2026-10-24
