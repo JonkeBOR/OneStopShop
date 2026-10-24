@@ -1,9 +1,10 @@
 import { eq, inArray } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import type { Program } from '../domain/types';
+import { exerciseVariantKey } from '../domain/achievement';
+import type { Program, SessionView } from '../domain/types';
 import { activateProgram } from './activation';
 import { addExercise, archiveExercise, deleteExercise, listExercises } from './exercises';
-import { getExerciseHistory } from './history';
+import { getExerciseHistory, getPreviousBests } from './history';
 import { ensureProfile } from './profile';
 import {
   addWorkout,
@@ -32,12 +33,14 @@ import {
 import { openTestDatabase, type TestDatabase } from './storage-test-database';
 import {
   createProgramFromSpec,
+  defaultVariantOf,
   expectOk,
   messagesOf,
   type ProgramSpec,
   rejectionOf,
 } from './storage-test-support';
-import { finishWorkout, getTrainingOverview, logSet, startWorkout } from './training';
+import { finishWorkout, getSession, getTrainingOverview, logSet, startWorkout } from './training';
+import { addVariant, switchSlotVariant } from './variants';
 
 describe('editing programs without losing history', () => {
   let testDatabase: TestDatabase;
@@ -496,5 +499,140 @@ describe('editing programs without losing history', () => {
       ok: false,
       error: 'not-found',
     });
+  });
+});
+
+describe('previous bests of a finished session', () => {
+  let testDatabase: TestDatabase;
+  let profileId: string;
+  let program: Program;
+  let clock: number;
+
+  const fourWorkouts: ProgramSpec = {
+    blockCount: 1,
+    workouts: ['A', 'B', 'C', 'D'].map((name) => ({
+      name,
+      slots: [{ exercise: 'Press', targetReps: [5] }],
+    })),
+  };
+
+  beforeAll(async () => {
+    testDatabase = await openTestDatabase();
+  });
+
+  afterAll(async () => {
+    await testDatabase.dispose();
+  });
+
+  beforeEach(async () => {
+    const { db } = testDatabase;
+    clock = Date.parse('2026-10-01T08:00:00Z');
+    profileId = (await ensureProfile(db, crypto.randomUUID(), tick())).id;
+    program = await createProgramFromSpec(db, profileId, fourWorkouts, tick());
+    expectOk(await activateProgram(db, profileId, program.id, tick()));
+  });
+
+  function tick(): Date {
+    clock += 60_000;
+    return new Date(clock);
+  }
+
+  function workoutId(index: number): string {
+    return program.workouts[index]?.id ?? '';
+  }
+
+  function pressId(): string {
+    return program.workouts[0]?.slots[0]?.exercise.id ?? '';
+  }
+
+  async function train(
+    index: number,
+    weightKg: number | null,
+    options: { finish?: boolean; variantId?: string } = {},
+  ): Promise<string> {
+    const { db } = testDatabase;
+    const session = expectOk(await startWorkout(db, profileId, workoutId(index), tick()));
+    const slot = session.slots[0];
+    if (options.variantId !== undefined) {
+      expectOk(
+        await switchSlotVariant(db, profileId, session.id, slot?.id ?? '', {
+          variantId: options.variantId,
+        }),
+      );
+    }
+    expectOk(
+      await logSet(
+        db,
+        profileId,
+        session.id,
+        slot?.plannedSets[0]?.id ?? '',
+        { reps: 5, weightKg },
+        tick(),
+      ),
+    );
+    if (options.finish ?? true) {
+      expectOk(await finishWorkout(db, profileId, session.id, tick()));
+    }
+    return session.id;
+  }
+
+  async function view(sessionId: string): Promise<SessionView> {
+    return expectOk(await getSession(testDatabase.db, profileId, sessionId));
+  }
+
+  async function defaultKey(): Promise<string> {
+    return exerciseVariantKey(pressId(), (await defaultVariantOf(testDatabase.db, pressId())).id);
+  }
+
+  it('takes the best of the most recent previous finished session of the same exercise and variant', async () => {
+    await train(0, 100);
+    await train(1, 90);
+    const current = await train(2, 80);
+
+    const bests = await getPreviousBests(testDatabase.db, profileId, await view(current));
+
+    expect(bests.get(await defaultKey())).toBeCloseTo(105, 6);
+  });
+
+  it('ignores the current session', async () => {
+    const current = await train(0, 100);
+
+    expect((await getPreviousBests(testDatabase.db, profileId, await view(current))).size).toBe(0);
+  });
+
+  it('ignores an unfinished session', async () => {
+    await train(0, 90);
+    await train(1, 120, { finish: false });
+    const current = await train(2, 80);
+
+    const bests = await getPreviousBests(testDatabase.db, profileId, await view(current));
+
+    expect(bests.get(await defaultKey())).toBeCloseTo(105, 6);
+  });
+
+  it('ignores a session finished after the current one', async () => {
+    const current = await train(0, 100);
+    await train(1, 120);
+
+    expect((await getPreviousBests(testDatabase.db, profileId, await view(current))).size).toBe(0);
+  });
+
+  it('keys a different variant separately', async () => {
+    const { db } = testDatabase;
+    const gymB = expectOk(await addVariant(db, profileId, pressId(), { name: 'Gym B' }, tick()));
+    await train(0, 90, { variantId: gymB.id });
+    const current = await train(1, 80);
+
+    const bests = await getPreviousBests(db, profileId, await view(current));
+
+    expect(bests.get(await defaultKey())).toBeUndefined();
+    expect(bests.get(exerciseVariantKey(pressId(), gymB.id))).toBeCloseTo(105, 6);
+  });
+
+  it('leaves out an exercise whose previous session logged no weight', async () => {
+    await train(0, null);
+    const current = await train(1, 80);
+
+    expect((await getPreviousBests(testDatabase.db, profileId, await view(current))).size).toBe(0);
   });
 });
