@@ -1,6 +1,6 @@
 # 013 — AI affirmations
 
-**Status**: accepted
+**Status**: superseded by 015
 **Date**: 2026-10-23
 
 ## Context

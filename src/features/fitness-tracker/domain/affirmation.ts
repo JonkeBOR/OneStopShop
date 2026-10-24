@@ -1,62 +1,80 @@
-import type { SessionView } from './types';
+export const affirmationCategories = [
+  'skipped-whole-workout',
+  'skipped-whole-exercise',
+  'skipped-sets',
+  'fully-completed',
+  'fully-completed-with-improvements',
+  'fully-completed-with-improvements-on-every-exercise',
+] as const;
 
-export const dailyAffirmationCap = 10;
-export const affirmationMaxLength = 200;
+export type AffirmationCategory = (typeof affirmationCategories)[number];
 
-const millisecondsPerMinute = 60000;
+export type AffirmationSet = Readonly<Record<AffirmationCategory, readonly string[]>>;
 
-export type AffirmationFacts = {
-  workout: string;
-  block: number | null;
-  durationMinutes: number | null;
-  totalSets: number;
-  totalReps: number;
-  totalVolumeKg: number;
-  exercises: { name: string; sets: number; topWeightKg: number | null }[];
-};
+export const affirmationMaxWords = 15;
+export const affirmationMaxLength = 120;
+export const affirmationsPerCategory = 7;
 
-export function affirmationFacts(session: SessionView): AffirmationFacts {
-  const performed = session.slots.filter((slot) => slot.loggedSets.length > 0);
-  const sets = performed.flatMap((slot) => slot.loggedSets);
-
-  return {
-    workout: session.workout.name,
-    block: session.block.number,
-    durationMinutes:
-      session.finishedAt === null
-        ? null
-        : Math.round(
-            (session.finishedAt.getTime() - session.startedAt.getTime()) / millisecondsPerMinute,
-          ),
-    totalSets: sets.length,
-    totalReps: sets.reduce((total, set) => total + set.reps, 0),
-    totalVolumeKg: Math.round(
-      sets.reduce((total, set) => total + (set.weightKg === null ? 0 : set.reps * set.weightKg), 0),
-    ),
-    exercises: performed.map((slot) => {
-      const weights = slot.loggedSets.flatMap((set) =>
-        set.weightKg === null ? [] : [set.weightKg],
-      );
-      return {
-        name: slot.exercise.name,
-        sets: slot.loggedSets.length,
-        topWeightKg: weights.length === 0 ? null : Math.max(...weights),
-      };
-    }),
-  };
-}
-
-export function parseAffirmation(value: unknown): string | null {
-  if (typeof value !== 'object' || value === null || !('affirmation' in value)) {
+function cleanLine(value: unknown): string | null {
+  if (typeof value !== 'string') {
     return null;
   }
-  const text = value.affirmation;
-  if (typeof text !== 'string') {
-    return null;
-  }
-  const trimmed = text.trim();
-  if (trimmed === '' || trimmed.length > affirmationMaxLength || /[\r\n]/.test(trimmed)) {
+  const trimmed = value.trim();
+  if (
+    trimmed === '' ||
+    trimmed.length > affirmationMaxLength ||
+    /[\r\n]/.test(trimmed) ||
+    trimmed.split(/\s+/).length > affirmationMaxWords
+  ) {
     return null;
   }
   return trimmed;
+}
+
+export function parseAffirmationSet(value: unknown): AffirmationSet | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return null;
+  }
+  const answer = value as Readonly<Record<string, unknown>>;
+  const seen = new Set<string>();
+  const set: Partial<Record<AffirmationCategory, string[]>> = {};
+  for (const category of affirmationCategories) {
+    const items = answer[category];
+    if (!Array.isArray(items)) {
+      return null;
+    }
+    const kept: string[] = [];
+    for (const item of items as unknown[]) {
+      const line = cleanLine(item);
+      const key = line?.toLowerCase();
+      if (line === null || key === undefined || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      if (kept.length < affirmationsPerCategory) {
+        kept.push(line);
+      }
+    }
+    if (kept.length < affirmationsPerCategory) {
+      return null;
+    }
+    set[category] = kept;
+  }
+  return set as AffirmationSet;
+}
+
+const millisecondsPerDay = 86_400_000;
+const daysSinceMonday = 6;
+
+export function affirmationWeekStart(at: Date): Date {
+  const midnight = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+  const daysIntoWeek = (at.getUTCDay() + daysSinceMonday) % 7;
+  return new Date(midnight - daysIntoWeek * millisecondsPerDay);
+}
+
+export function pickAffirmation(
+  texts: readonly string[],
+  sessionIndexInWeek: number,
+): string | null {
+  return texts[sessionIndexInWeek % texts.length] ?? null;
 }

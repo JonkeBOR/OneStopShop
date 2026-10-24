@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test, vi, type MockInstance } from 'vitest';
-import { generateJson, getGeminiGenerator, type GeminiSchema } from './gemini';
+import { generateJson, readGeminiConfig, type GeminiSchema } from './client';
 
 const endpoint =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent';
@@ -16,6 +16,8 @@ const request = {
   systemInstruction: 'Be brief.',
   userMessage: '{"sets":3}',
   responseSchema,
+  timeoutMilliseconds: 4000,
+  maxOutputTokens: 256,
 };
 
 function geminiResponse(body: unknown, status = 200): Response {
@@ -71,7 +73,6 @@ beforeEach(() => {
 
 afterEach(() => {
   warn.mockRestore();
-  vi.unstubAllEnvs();
 });
 
 describe('generateJson', () => {
@@ -127,7 +128,7 @@ describe('generateJson', () => {
       resolvingTo(geminiResponse(answer('{"affirmation":"Huge."}'))),
     );
 
-    expect(result).toEqual({ affirmation: 'Huge.' });
+    expect(result).toEqual({ ok: true, value: { affirmation: 'Huge.' } });
   });
 
   test('joins text parts and skips thought parts', async () => {
@@ -144,17 +145,17 @@ describe('generateJson', () => {
 
     const result = await generateJson(config, request, resolvingTo(geminiResponse(body)));
 
-    expect(result).toEqual({ a: 1 });
+    expect(result).toEqual({ ok: true, value: { a: 1 } });
   });
 
-  test('returns null on a quota error and logs only the status', async () => {
+  test('marks a quota error as retryable and logs only the status', async () => {
     const result = await generateJson(
       config,
       request,
       resolvingTo(geminiResponse({ error: { message: 'quota' } }, 429)),
     );
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'status 429', retryable: true });
     expect(warn).toHaveBeenCalledTimes(1);
     const logged = (warn.mock.calls[0] ?? []).map((argument) => String(argument));
     expect(logged.some((text) => text.includes('429'))).toBe(true);
@@ -174,99 +175,145 @@ describe('generateJson', () => {
     expect(cancel).toHaveBeenCalledTimes(1);
   });
 
-  test('returns null on a server error', async () => {
+  test('marks a server error as retryable', async () => {
     const result = await generateJson(config, request, resolvingTo(geminiResponse({}, 503)));
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'status 503', retryable: true });
   });
 
-  test('returns null when the prompt is blocked', async () => {
+  test('marks a blocked prompt as not retryable', async () => {
     const result = await generateJson(
       config,
       request,
       resolvingTo(geminiResponse({ promptFeedback: { blockReason: 'SAFETY' } })),
     );
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'blocked', retryable: false });
   });
 
-  test('returns null unless the answer finished with STOP', async () => {
+  test('marks an answer cut off at MAX_TOKENS as retryable', async () => {
     const result = await generateJson(
       config,
       request,
       resolvingTo(geminiResponse(answer('{"a":1}', 'MAX_TOKENS'))),
     );
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'finish MAX_TOKENS', retryable: true });
   });
 
-  test('returns null for an answer that is not JSON', async () => {
+  test('marks an answer that is not JSON as retryable', async () => {
     const result = await generateJson(
       config,
       request,
       resolvingTo(geminiResponse(answer('Great job!'))),
     );
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'invalid response', retryable: true });
   });
 
-  test('returns null for a body that is not JSON', async () => {
+  test('marks a body that is not JSON as retryable', async () => {
     const result = await generateJson(
       config,
       request,
       resolvingTo(new Response('<html>', { status: 200 })),
     );
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'invalid response', retryable: true });
   });
 
-  test('returns null when there are no candidates', async () => {
+  test('marks an answer without candidates as retryable', async () => {
     const result = await generateJson(config, request, resolvingTo(geminiResponse({})));
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'no candidates', retryable: true });
   });
 
-  test('returns null when the request times out', async () => {
+  test('marks a timeout as retryable', async () => {
     const result = await generateJson(
       config,
       request,
       rejectingWith(new DOMException('timed out', 'TimeoutError')),
     );
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'timeout', retryable: true });
     const logged = warn.mock.calls.flat().map((argument) => String(argument));
     expect(logged.some((text) => text.includes('timeout'))).toBe(true);
   });
 
-  test('returns null when the network fails', async () => {
+  test('marks a network failure as retryable', async () => {
     const result = await generateJson(
       config,
       request,
       rejectingWith(new TypeError('fetch failed')),
     );
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'network', retryable: true });
   });
+  test("sends the request's maxOutputTokens", async () => {
+    const { fetchFn, calls } = recordingFetch(geminiResponse(answer('{"a":1}')));
+
+    await generateJson(config, { ...request, maxOutputTokens: 4096 }, fetchFn);
+
+    const body = JSON.parse(requestBody(onlyCall(calls))) as {
+      generationConfig: { maxOutputTokens: number };
+    };
+    expect(body.generationConfig.maxOutputTokens).toBe(4096);
+  });
+
+  test("aborts after the request's timeout", async () => {
+    const waitForAbort: typeof fetch = (_url, init) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => {
+          reject(init.signal?.reason as Error);
+        });
+      });
+
+    const result = await generateJson(
+      config,
+      { ...request, timeoutMilliseconds: 10 },
+      waitForAbort,
+    );
+
+    expect(result).toEqual({ ok: false, reason: 'timeout', retryable: true });
+  });
+
+  test.each([400, 401, 403, 404])('marks status %i as not retryable', async (status) => {
+    const result = await generateJson(config, request, resolvingTo(geminiResponse({}, status)));
+
+    expect(result).toEqual({ ok: false, reason: `status ${status}`, retryable: false });
+  });
+
+  test.each(['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII'])(
+    'marks a %s finish as not retryable',
+    async (finishReason) => {
+      const result = await generateJson(
+        config,
+        request,
+        resolvingTo(geminiResponse(answer('{"a":1}', finishReason))),
+      );
+
+      expect(result).toEqual({ ok: false, reason: `finish ${finishReason}`, retryable: false });
+    },
+  );
 });
 
-describe('getGeminiGenerator', () => {
-  test('has no generator without a key', () => {
-    vi.stubEnv('GEMINI_API_KEY', '');
-
-    expect(getGeminiGenerator()).toBeNull();
+describe('readGeminiConfig', () => {
+  test('reads the Gemini key, trimmed, when Gemini is enabled', () => {
+    expect(
+      readGeminiConfig({ GEMINI_API_KEY: '  gemini-key  ', GEMINI_ENABLED: ' true ' }),
+    ).toEqual({
+      apiKey: 'gemini-key',
+    });
   });
 
-  test('has no generator with a key while Gemini is not enabled', () => {
-    vi.stubEnv('GEMINI_API_KEY', 'k');
-    vi.stubEnv('GEMINI_ENABLED', '');
-
-    expect(getGeminiGenerator()).toBeNull();
+  test('has no Gemini config when the key is missing or blank', () => {
+    expect(readGeminiConfig({ GEMINI_ENABLED: 'true' })).toBeNull();
+    expect(readGeminiConfig({ GEMINI_API_KEY: '   ', GEMINI_ENABLED: 'true' })).toBeNull();
   });
 
-  test('has a generator with a key when Gemini is enabled', () => {
-    vi.stubEnv('GEMINI_API_KEY', 'k');
-    vi.stubEnv('GEMINI_ENABLED', 'true');
-
-    expect(getGeminiGenerator()).toBeTypeOf('function');
+  test('has no Gemini config unless Gemini is explicitly enabled', () => {
+    expect(readGeminiConfig({ GEMINI_API_KEY: 'gemini-key' })).toBeNull();
+    expect(readGeminiConfig({ GEMINI_API_KEY: 'gemini-key', GEMINI_ENABLED: '' })).toBeNull();
+    expect(readGeminiConfig({ GEMINI_API_KEY: 'gemini-key', GEMINI_ENABLED: 'false' })).toBeNull();
+    expect(readGeminiConfig({ GEMINI_API_KEY: 'gemini-key', GEMINI_ENABLED: '1' })).toBeNull();
   });
 });

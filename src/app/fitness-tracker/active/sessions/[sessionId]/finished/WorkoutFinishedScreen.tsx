@@ -1,12 +1,11 @@
 import Link from 'next/link';
-import type { ReactNode } from 'react';
 import { BlockWorkoutRow } from '@/features/fitness-tracker/components/BlockWorkoutRow';
 import type { TrainingOverview } from '@/features/fitness-tracker/domain/types';
 import { fitnessStrings } from '@/lib/strings/fitness';
 import styles from './WorkoutFinishedScreen.module.css';
 
 type WorkoutFinishedScreenProps = {
-  affirmation: ReactNode;
+  affirmation: string;
   workoutName: string;
   overview: TrainingOverview;
   completedBlock: number | null;

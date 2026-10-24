@@ -1,6 +1,7 @@
 import 'server-only';
-import { and, asc, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gte, isNull, lt, or, sql } from 'drizzle-orm';
 import type { Database } from '@/lib/server/database';
+import { affirmationWeekStart } from '../domain/affirmation';
 import { decideLogSet, prefill } from '../domain/logging';
 import { blockStatuses, decideAfterFinish } from '../domain/progression';
 import { fail, type Result, succeed } from '../domain/result';
@@ -227,6 +228,32 @@ export async function getSession(
       };
     }),
   });
+}
+
+export async function countEarlierSessionsThisWeek(
+  db: Database,
+  profileId: string,
+  session: SessionView,
+): Promise<number> {
+  const { finishedAt } = session;
+  if (finishedAt === null) {
+    return 0;
+  }
+  const [row] = await db
+    .select({ earlier: count() })
+    .from(workoutSessions)
+    .where(
+      and(
+        eq(workoutSessions.profileId, profileId),
+        eq(workoutSessions.status, 'finished'),
+        gte(workoutSessions.finishedAt, affirmationWeekStart(finishedAt)),
+        or(
+          lt(workoutSessions.finishedAt, finishedAt),
+          and(eq(workoutSessions.finishedAt, finishedAt), lt(workoutSessions.id, session.id)),
+        ),
+      ),
+    );
+  return row?.earlier ?? 0;
 }
 
 export async function getSessionSlotSettings(

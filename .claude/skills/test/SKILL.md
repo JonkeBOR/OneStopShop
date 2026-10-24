@@ -117,8 +117,10 @@ Playwright boots `npm run dev` itself and reuses an already-running server on po
 server is deliberate rather than a production build: it keeps one server shared with the MCP loop,
 and Server Components still render for real.
 
-The e2e server runs with `GEMINI_API_KEY` blanked so no test calls Google; stop any dev server you
-started yourself before `npm run e2e`, because Playwright reuses it with whatever key `.env.local` has.
+The app never calls Gemini, so the e2e server needs no key handling. `e2e/affirmations.spec.ts`
+seeds and clears the global `affirmations` table with `wrangler d1 execute --local`, so an e2e run
+overwrites any set the jobs Worker stored locally. Its tests run serially; other specs must not
+assert which affirmation appears.
 
 The first run needs `npm run e2e:install` (WebKit only, ~90 MB). `e2e.ps1` exits 2 with that
 instruction if the browser is missing.

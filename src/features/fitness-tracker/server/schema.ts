@@ -8,6 +8,7 @@ import {
   text,
   uniqueIndex,
 } from 'drizzle-orm/sqlite-core';
+import { affirmationCategories } from '../domain/affirmation';
 import { bodyPartIds, bodyPartRoles } from '../domain/body-part';
 
 export const sessionStatuses = ['in_progress', 'finished'] as const;
@@ -249,6 +250,18 @@ export const bodyweightEntries = sqliteTable(
     recordedAt: integer('recorded_at', { mode: 'timestamp_ms' }).notNull(),
   },
   (table) => [uniqueIndex('bodyweight_profile_date').on(table.profileId, table.entryDate)],
+);
+
+export const affirmations = sqliteTable(
+  'affirmations',
+  {
+    id: text('id').primaryKey(),
+    category: text('category', { enum: affirmationCategories }).notNull(),
+    position: integer('position').notNull(),
+    text: text('text').notNull(),
+    generatedAt: integer('generated_at', { mode: 'timestamp_ms' }).notNull(),
+  },
+  (table) => [uniqueIndex('affirmations_category_position').on(table.category, table.position)],
 );
 
 export const programsRelations = relations(programs, ({ many }) => ({

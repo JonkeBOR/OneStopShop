@@ -106,7 +106,6 @@ test('builds a program, trains it, and finds the logged weight prefilled in the 
   const affirmation = page.getByRole('heading', { level: 1 });
   await expect(affirmation).toBeVisible();
   await expect(affirmation).not.toBeEmpty();
-  expect(fitnessStrings.finished.affirmations).toContain(await affirmation.textContent());
   await expect(page.getByText(fitnessStrings.block.programComplete)).toBeVisible();
 
   await page

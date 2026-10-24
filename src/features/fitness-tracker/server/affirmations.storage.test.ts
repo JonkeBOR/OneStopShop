@@ -1,28 +1,62 @@
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-  type MockInstance,
-} from 'vitest';
-import type { GenerateJson } from '@/lib/server/gemini';
-import { dailyAffirmationCap } from '../domain/affirmation';
+import { readFile, readdir } from 'node:fs/promises';
+import { sql } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Database } from '@/lib/server/database';
+import type { AffirmationCategory } from '../domain/affirmation';
+import type { Program, SessionView } from '../domain/types';
 import { activateProgram } from './activation';
-import { affirmationFor, claimAffirmation, readAffirmation, saveAffirmation } from './affirmations';
+import {
+  finishedSessionAffirmation,
+  readAffirmations,
+  readAffirmationSetGeneratedAt,
+  replaceAffirmationSet,
+} from './affirmations';
 import { ensureProfile } from './profile';
-import { openTestDatabase, type TestDatabase } from './storage-test-database';
-import { activeOverview, createProgramFromSpec, expectOk } from './storage-test-support';
-import { finishWorkout, getSession, startWorkout } from './training';
+import { affirmations } from './schema';
+import {
+  openEmptyTestDatabase,
+  openTestDatabase,
+  type TestDatabase,
+} from './storage-test-database';
+import {
+  affirmationSetOf,
+  createProgramFromSpec,
+  expectOk,
+  type ProgramSpec,
+} from './storage-test-support';
+import { finishWorkout, getSession, logSet, startWorkout } from './training';
+
+const statementBreakpoint = '--> statement-breakpoint';
+
+function linesFor(category: AffirmationCategory): string[] {
+  return Array.from({ length: 7 }, (_, position) => `${category} line ${position}`);
+}
+
+async function seed(db: Database, category: AffirmationCategory, texts: string[]): Promise<void> {
+  await db.insert(affirmations).values(
+    texts.map((text, position) => ({
+      id: crypto.randomUUID(),
+      category,
+      position,
+      text,
+      generatedAt: new Date('2026-10-19T03:00:00Z'),
+    })),
+  );
+}
 
 describe('affirmations', () => {
   let testDatabase: TestDatabase;
   let profileId: string;
-  const now = new Date('2026-10-02T10:00:00Z');
-  const dayInMilliseconds = 86_400_000;
+  let program: Program;
+  let clock: number;
+
+  const sevenWorkouts: ProgramSpec = {
+    blockCount: 1,
+    workouts: Array.from({ length: 7 }, (_, index) => ({
+      name: `Day ${index + 1}`,
+      slots: [{ exercise: 'Press', targetReps: [5] }],
+    })),
+  };
 
   beforeAll(async () => {
     testDatabase = await openTestDatabase();
@@ -34,252 +68,161 @@ describe('affirmations', () => {
 
   beforeEach(async () => {
     const { db } = testDatabase;
-    profileId = (await ensureProfile(db, crypto.randomUUID(), now)).id;
-    const program = await createProgramFromSpec(
-      db,
-      profileId,
-      {
-        blockCount: 1,
-        workouts: [{ name: 'Only', slots: [{ exercise: 'Row', targetReps: [10] }] }],
-      },
-      now,
+    await db.delete(affirmations);
+    clock = Date.parse('2026-10-19T08:00:00Z');
+    profileId = (await ensureProfile(db, crypto.randomUUID(), tick())).id;
+    program = await createProgramFromSpec(db, profileId, sevenWorkouts, tick());
+    expectOk(await activateProgram(db, profileId, program.id, tick()));
+  });
+
+  function tick(): Date {
+    clock += 60_000;
+    return new Date(clock);
+  }
+
+  async function finishCompleted(index: number): Promise<SessionView> {
+    const { db } = testDatabase;
+    const started = expectOk(
+      await startWorkout(db, profileId, program.workouts[index]?.id ?? '', tick()),
     );
-    expectOk(await activateProgram(db, profileId, program.id, now));
+    expectOk(
+      await logSet(
+        db,
+        profileId,
+        started.id,
+        started.slots[0]?.plannedSets[0]?.id ?? '',
+        { reps: 5, weightKg: 100 },
+        tick(),
+      ),
+    );
+    expectOk(await finishWorkout(db, profileId, started.id, tick()));
+    return expectOk(await getSession(db, profileId, started.id));
+  }
+
+  it('reads one category in position order', async () => {
+    const { db } = testDatabase;
+    const generatedAt = new Date('2026-10-19T03:00:00Z');
+    await db.insert(affirmations).values([
+      { id: 'a3', category: 'skipped-sets', position: 2, text: 'third', generatedAt },
+      { id: 'a1', category: 'skipped-sets', position: 0, text: 'first', generatedAt },
+      { id: 'a2', category: 'skipped-sets', position: 1, text: 'second', generatedAt },
+    ]);
+    await seed(db, 'fully-completed', ['other']);
+
+    expect(await readAffirmations(db, 'skipped-sets')).toEqual(['first', 'second', 'third']);
   });
 
-  async function startedSessionId(at: Date): Promise<string> {
+  it('gives a line from the category the session achieved', async () => {
     const { db } = testDatabase;
-    const overview = await activeOverview(db, profileId);
-    const workoutId = overview.suggestedWorkoutId ?? overview.workouts[0]?.id ?? '';
-    return expectOk(await startWorkout(db, profileId, workoutId, at)).id;
-  }
+    await seed(db, 'fully-completed', linesFor('fully-completed'));
+    await seed(db, 'skipped-whole-workout', linesFor('skipped-whole-workout'));
 
-  async function finishedSessionId(at: Date): Promise<string> {
-    const sessionId = await startedSessionId(at);
-    expectOk(await finishWorkout(testDatabase.db, profileId, sessionId, at));
-    return sessionId;
-  }
+    const session = await finishCompleted(0);
 
-  async function claimTenSessions(at: Date): Promise<void> {
-    for (let index = 0; index < dailyAffirmationCap; index += 1) {
-      const sessionId = await finishedSessionId(at);
-      expect(await claimAffirmation(testDatabase.db, profileId, sessionId, at)).toBe(true);
+    expect(linesFor('fully-completed')).toContain(
+      await finishedSessionAffirmation(db, profileId, session),
+    );
+  });
+
+  it('gives consecutive sessions in a week different lines', async () => {
+    const { db } = testDatabase;
+    await seed(db, 'fully-completed', linesFor('fully-completed'));
+    const shown: (string | null)[] = [];
+
+    for (let index = 0; index < 7; index += 1) {
+      const session = await finishCompleted(index);
+      shown.push(await finishedSessionAffirmation(db, profileId, session));
     }
-  }
 
-  it('claims a finished session once', async () => {
+    expect(shown).toEqual(linesFor('fully-completed'));
+  });
+
+  it('gives nothing when the category has no affirmations', async () => {
     const { db } = testDatabase;
-    const sessionId = await finishedSessionId(now);
+    await seed(db, 'skipped-whole-workout', linesFor('skipped-whole-workout'));
 
-    expect(await claimAffirmation(db, profileId, sessionId, now)).toBe(true);
-    expect(await claimAffirmation(db, profileId, sessionId, now)).toBe(false);
+    const session = await finishCompleted(0);
+
+    expect(await finishedSessionAffirmation(db, profileId, session)).toBeNull();
+  });
+});
+
+describe('replacing the affirmation set', () => {
+  let testDatabase: TestDatabase;
+
+  beforeAll(async () => {
+    testDatabase = await openTestDatabase();
   });
 
-  it('does not claim a session that is not finished', async () => {
-    const sessionId = await startedSessionId(now);
-
-    expect(await claimAffirmation(testDatabase.db, profileId, sessionId, now)).toBe(false);
+  afterAll(async () => {
+    await testDatabase.dispose();
   });
 
-  it("does not claim another profile's session", async () => {
+  beforeEach(async () => {
+    await testDatabase.db.delete(affirmations);
+  });
+
+  it('has no generated time when the table is empty', async () => {
+    expect(await readAffirmationSetGeneratedAt(testDatabase.db)).toBeNull();
+  });
+
+  it('replaces a full 6×7 set in one batch', async () => {
     const { db } = testDatabase;
-    const sessionId = await finishedSessionId(now);
-    const otherProfileId = (await ensureProfile(db, crypto.randomUUID(), now)).id;
+    const generatedAt = new Date('2026-10-26T03:00:00Z');
+    await replaceAffirmationSet(db, affirmationSetOf('old'), new Date('2026-10-19T03:00:00Z'));
 
-    expect(await claimAffirmation(db, otherProfileId, sessionId, now)).toBe(false);
-    expect(await claimAffirmation(db, profileId, sessionId, now)).toBe(true);
+    await replaceAffirmationSet(db, affirmationSetOf('new'), generatedAt);
+
+    const rows = await db.select().from(affirmations);
+    expect(rows).toHaveLength(42);
+    expect(new Set(rows.map((row) => row.generatedAt.getTime()))).toEqual(
+      new Set([generatedAt.getTime()]),
+    );
+    expect(rows.every((row) => row.text.startsWith('new '))).toBe(true);
+    expect(await readAffirmations(db, 'skipped-sets')).toEqual(
+      affirmationSetOf('new')['skipped-sets'],
+    );
+    expect(await readAffirmationSetGeneratedAt(db)).toEqual(generatedAt);
+  });
+});
+
+describe('affirmations when storage fails', () => {
+  let testDatabase: TestDatabase;
+
+  beforeAll(async () => {
+    testDatabase = await openEmptyTestDatabase('affirmations-storage-fails');
+    const files = (await readdir('migrations')).filter((file) => file.endsWith('.sql'));
+    for (const file of files.toSorted()) {
+      const text = await readFile(`migrations/${file}`, 'utf-8');
+      for (const statement of text.split(statementBreakpoint)) {
+        if (statement.trim().length > 0) {
+          await testDatabase.db.run(sql.raw(statement));
+        }
+      }
+    }
+  }, 120000);
+
+  afterAll(async () => {
+    await testDatabase.dispose();
   });
 
-  it('stops claiming at the daily cap', async () => {
-    await claimTenSessions(now);
-    const eleventh = await finishedSessionId(now);
-
-    expect(await claimAffirmation(testDatabase.db, profileId, eleventh, now)).toBe(false);
-  });
-
-  it('counts only claims from the last 24 hours', async () => {
-    await claimTenSessions(new Date(now.getTime() - dayInMilliseconds - 1));
-    const sessionId = await finishedSessionId(now);
-
-    expect(await claimAffirmation(testDatabase.db, profileId, sessionId, now)).toBe(true);
-  });
-
-  it('counts a claim made just inside the 24 hours', async () => {
-    await claimTenSessions(new Date(now.getTime() - dayInMilliseconds + 1));
-    const sessionId = await finishedSessionId(now);
-
-    expect(await claimAffirmation(testDatabase.db, profileId, sessionId, now)).toBe(false);
-  });
-
-  it('reads nothing before an affirmation is saved', async () => {
-    const sessionId = await finishedSessionId(now);
-
-    expect(await readAffirmation(testDatabase.db, profileId, sessionId)).toBeNull();
-  });
-
-  it('saves an affirmation and reads it back', async () => {
+  it('gives nothing when reading fails', async () => {
     const { db } = testDatabase;
-    const sessionId = await finishedSessionId(now);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    await db.run(sql`DROP TABLE affirmations`);
+    const profileId = (await ensureProfile(db, crypto.randomUUID(), new Date())).id;
+    const session: SessionView = {
+      id: 'session',
+      status: 'finished',
+      startedAt: new Date('2026-10-19T08:00:00Z'),
+      finishedAt: new Date('2026-10-19T09:00:00Z'),
+      workout: { id: 'workout', name: 'Day' },
+      block: { id: 'block', number: 1, label: null },
+      slots: [],
+    };
 
-    await saveAffirmation(db, profileId, sessionId, 'Huge.');
-
-    expect(await readAffirmation(db, profileId, sessionId)).toBe('Huge.');
-  });
-
-  it('does not overwrite a saved affirmation', async () => {
-    const { db } = testDatabase;
-    const sessionId = await finishedSessionId(now);
-
-    await saveAffirmation(db, profileId, sessionId, 'First.');
-    await saveAffirmation(db, profileId, sessionId, 'Second.');
-
-    expect(await readAffirmation(db, profileId, sessionId)).toBe('First.');
-  });
-
-  it("does not save to another profile's session", async () => {
-    const { db } = testDatabase;
-    const sessionId = await finishedSessionId(now);
-    const otherProfileId = (await ensureProfile(db, crypto.randomUUID(), now)).id;
-
-    await saveAffirmation(db, otherProfileId, sessionId, 'Not yours.');
-
-    expect(await readAffirmation(db, profileId, sessionId)).toBeNull();
-  });
-
-  async function finishedSession(at: Date) {
-    const sessionId = await finishedSessionId(at);
-    return expectOk(await getSession(testDatabase.db, profileId, sessionId));
-  }
-
-  describe('affirmationFor', () => {
-    it('writes, saves and returns an affirmation once', async () => {
-      const { db } = testDatabase;
-      const session = await finishedSession(now);
-      const generate = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
-
-      expect(await affirmationFor(db, profileId, session, now, generate)).toBe('Huge.');
-      expect(await affirmationFor(db, profileId, session, now, generate)).toBe('Huge.');
-
-      expect(generate).toHaveBeenCalledTimes(1);
-      expect(await readAffirmation(db, profileId, session.id)).toBe('Huge.');
-    });
-
-    it('does not claim or call anything without a generator', async () => {
-      const { db } = testDatabase;
-      const session = await finishedSession(now);
-      const generate = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
-
-      expect(await affirmationFor(db, profileId, session, now, null)).toBeNull();
-      expect(await affirmationFor(db, profileId, session, now, generate)).toBe('Huge.');
-      expect(generate).toHaveBeenCalledTimes(1);
-    });
-
-    it('does not retry after a failed answer', async () => {
-      const { db } = testDatabase;
-      const session = await finishedSession(now);
-      const failing = vi.fn<GenerateJson>().mockResolvedValue(null);
-      const succeeding = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
-
-      expect(await affirmationFor(db, profileId, session, now, failing)).toBeNull();
-      expect(await affirmationFor(db, profileId, session, now, succeeding)).toBeNull();
-      expect(succeeding).not.toHaveBeenCalled();
-    });
-
-    describe('when the flow fails', () => {
-      let warn: MockInstance<(...data: unknown[]) => void>;
-
-      beforeEach(() => {
-        warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      });
-
-      afterEach(() => {
-        warn.mockRestore();
-      });
-
-      it('gives nothing when the generator rejects, and does not retry', async () => {
-        const { db } = testDatabase;
-        const session = await finishedSession(now);
-        const failing = vi.fn<GenerateJson>().mockRejectedValue(new Error('boom'));
-        const succeeding = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
-
-        expect(await affirmationFor(db, profileId, session, now, failing)).toBeNull();
-        expect(await affirmationFor(db, profileId, session, now, succeeding)).toBeNull();
-        expect(succeeding).not.toHaveBeenCalled();
-      });
-
-      it('returns the written text even when saving fails', async () => {
-        const { db } = testDatabase;
-        const session = await finishedSession(now);
-        const generate = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
-        let updates = 0;
-        const failingSave = new Proxy(db, {
-          get(target, property, receiver) {
-            if (property !== 'update') {
-              return Reflect.get(target, property, receiver) as unknown;
-            }
-            return (...args: Parameters<typeof target.update>) => {
-              updates += 1;
-              if (updates === 2) {
-                throw new Error('save failed');
-              }
-              return target.update(...args);
-            };
-          },
-        });
-
-        expect(await affirmationFor(failingSave, profileId, session, now, generate)).toBe('Huge.');
-        expect(warn).toHaveBeenCalledWith('Affirmation failed: storage');
-      });
-
-      it('gives nothing when storage fails before the claim', async () => {
-        const { db } = testDatabase;
-        const session = await finishedSession(now);
-        const generate = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
-        const failingRead = new Proxy(db, {
-          get(target, property, receiver) {
-            if (property === 'select') {
-              return () => {
-                throw new Error('read failed');
-              };
-            }
-            return Reflect.get(target, property, receiver) as unknown;
-          },
-        });
-
-        expect(await affirmationFor(failingRead, profileId, session, now, generate)).toBeNull();
-        expect(generate).not.toHaveBeenCalled();
-      });
-    });
-
-    it('loses to a render that already claimed', async () => {
-      const { db } = testDatabase;
-      const session = await finishedSession(now);
-      const generate = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
-      await claimAffirmation(db, profileId, session.id, now);
-
-      expect(await affirmationFor(db, profileId, session, now, generate)).toBeNull();
-      expect(generate).not.toHaveBeenCalled();
-    });
-
-    it('shows a stored affirmation without a generator', async () => {
-      const { db } = testDatabase;
-      const session = await finishedSession(now);
-      await saveAffirmation(db, profileId, session.id, 'Kept.');
-
-      expect(await affirmationFor(db, profileId, session, now, null)).toBe('Kept.');
-    });
-
-    it('sends no ids or dates to the generator', async () => {
-      const { db } = testDatabase;
-      const session = await finishedSession(now);
-      const generate = vi.fn<GenerateJson>().mockResolvedValue({ affirmation: 'Huge.' });
-
-      await affirmationFor(db, profileId, session, now, generate);
-
-      const userMessage = generate.mock.calls[0]?.[0].userMessage ?? '';
-      expect(userMessage).not.toContain(session.id);
-      expect(userMessage).not.toContain(profileId);
-      expect(userMessage).not.toContain('2026');
-    });
+    expect(await finishedSessionAffirmation(db, profileId, session)).toBeNull();
+    expect(warn).toHaveBeenCalledWith('Affirmation failed: storage');
+    warn.mockRestore();
   });
 });

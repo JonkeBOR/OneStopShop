@@ -22,7 +22,7 @@ export default tseslint.config(
       'playwright-report/**',
       'blob-report/**',
       '.open-next/**',
-      '.wrangler/**',
+      '**/.wrangler/**',
       'next-env.d.ts',
     ],
   },

@@ -35,6 +35,7 @@ export default defineConfig({
             'src/lib/**/*.test.ts',
             'src/app/api/**/*.test.ts',
             'src/features/**/*.test.ts',
+            'jobs/**/*.test.ts',
           ],
           exclude: ['**/*.storage.test.ts', '**/node_modules/**'],
         },

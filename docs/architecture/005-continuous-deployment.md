@@ -34,6 +34,9 @@ the owner can reach or trigger.
    running it before the deploy means new code never meets an old schema.
 4. `opennextjs-cloudflare build`, then `opennextjs-cloudflare deploy`, which updates the existing
    `onestopshop` Worker in place.
+5. `wrangler deploy -c jobs/wrangler.jsonc`, which deploys the `onestopshop-jobs` Worker with the
+   same token. Migrations already ran in step 3, so neither Worker meets a schema it doesn't expect.
+   See [014](014-scheduled-jobs.md).
 
 The build runs in a fresh checkout, where no `.env*` file exists, so nothing local reaches the
 bundle.

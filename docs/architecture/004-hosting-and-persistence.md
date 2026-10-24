@@ -89,17 +89,20 @@ Wrangler is recorded in [006-domain-persistence.md](006-domain-persistence.md).
 | `OWNER_EMAIL`          | `.env.local` and `.dev.vars` | `wrangler.jsonc` `vars` |
 | `GOOGLE_CLIENT_SECRET` | `.env.local` and `.dev.vars` | `wrangler secret put`   |
 | `SESSION_SECRET`       | `.env.local` and `.dev.vars` | `wrangler secret put`   |
-| `GEMINI_API_KEY`       | `.env.local` and `.dev.vars` | `wrangler secret put`   |
-| `GEMINI_ENABLED`       | `.env.local` and `.dev.vars` | `wrangler.jsonc` `vars` |
 
 Only `src/lib/server/config.ts` reads them. The OAuth redirect URI is derived from the request's
 origin, so there is no `APP_URL`.
 
-`GEMINI_API_KEY` is optional, and Gemini is called only when `GEMINI_ENABLED` is exactly `true`:
-otherwise the finished screen shows only the fixed affirmations. Both local files set
-`GEMINI_ENABLED=false` and are switched together for a live test. `npm run preview` and
-`wrangler dev` would otherwise inherit `true` from `vars`; `next dev` never sees `vars` in
-`process.env`. See [013](013-ai-affirmations.md).
+The app Worker holds no Gemini configuration. `GEMINI_API_KEY` and `GEMINI_ENABLED` belong to the
+jobs Worker:
+
+| Value            | Local             | Deployed                                            |
+| ---------------- | ----------------- | --------------------------------------------------- |
+| `GEMINI_API_KEY` | `jobs/.dev.vars`  | `wrangler secret put GEMINI_API_KEY -c jobs/wrangler.jsonc` |
+| `GEMINI_ENABLED` | `jobs/.dev.vars`  | `jobs/wrangler.jsonc` `vars`                        |
+
+Gemini is called only when `GEMINI_ENABLED` is exactly `true` and a key is present. See
+[014](014-scheduled-jobs.md) and [015](015-weekly-affirmation-categories.md).
 
 ## Consequences
 

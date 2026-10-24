@@ -28,6 +28,20 @@ storage test run, because it makes storage tests fail intermittently. The `test`
 `next build` also type-checks with the local `tsc`. Run it before concluding that a change is
 deployable - it catches Server/Client boundary errors that `next dev` tolerates.
 
+## The jobs Worker
+
+The scheduled jobs run in `onestopshop-jobs`, configured by `jobs/wrangler.jsonc`. Run its cron
+locally against the same database `next dev` uses:
+
+    npx wrangler dev -c jobs/wrangler.jsonc --test-scheduled --persist-to .wrangler/state --var GEMINI_ENABLED:false
+    curl.exe "http://localhost:8787/__scheduled?cron=0+3+*+*+*"
+
+`--persist-to .wrangler/state` is needed because Wrangler would otherwise keep the jobs Worker's
+state under `jobs/.wrangler/`. With `GEMINI_ENABLED:false`, or no key, the log shows
+`Weekly affirmations: disabled`. A live run needs `GEMINI_API_KEY` and `GEMINI_ENABLED=true` in
+`jobs/.dev.vars`, which only the owner creates. Agents never start it that way. The Worker has no
+`fetch` handler, so any other URL returns 500.
+
 ## LAN exposure for iPhone testing
 
     npm run dev -- -H 0.0.0.0

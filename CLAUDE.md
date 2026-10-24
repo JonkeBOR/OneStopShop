@@ -42,7 +42,7 @@ the fitness tracker at `/fitness-tracker` is the app's first feature. `wrangler.
 and the D1 binding. See
 [004-hosting-and-persistence.md](docs/architecture/004-hosting-and-persistence.md).
 
-The fitness tracker is built end to end. The domain is Drizzle ORM with a fifteen-table schema in
+The fitness tracker is built end to end. The domain is Drizzle ORM with a sixteen-table schema in
 `src/features/fitness-tracker/server/schema.ts`, migrations generated into `migrations/`, pure rules
 in `src/features/fitness-tracker/domain/`, and server-only operations in
 `src/features/fitness-tracker/server/` that take a `Database` from `src/lib/server/database.ts` as
@@ -70,19 +70,26 @@ variant; variants can be renamed. Deleting a program is a soft delete: its row s
 tombstone with its name and `deleted_at`, its plan is removed, and every program operation treats
 it as not found. The home page has a bodyweight chart and the exercise page a chart with program
 bands of each session's heaviest weight, or of its best estimated 1RM, built with Recharts from
-`domain/progress-chart.ts`. The finished screen shows a Gemini-written affirmation once per
-session, through the feature-agnostic client in `src/lib/server/gemini.ts`, and falls back to the
-fixed lines. See
+`domain/progress-chart.ts`. The finished screen classifies the session into one of six achievement
+categories (`domain/achievement.ts`) and shows one of that category's stored affirmations, picked by
+the session's position in its week, and falls back to the fixed lines. It never calls Gemini. The
+affirmations come from a weekly job in a separate cron-only Worker, `onestopshop-jobs` in `jobs/`,
+which asks Gemini through the feature-agnostic client in `src/lib/gemini/client.ts` and replaces the
+`affirmations` table on success. Jobs are plain functions under `src/features/<feature>/jobs/`, and
+`jobs/` holds only the Cloudflare adapter and the schedule map. See
 [006-domain-persistence.md](docs/architecture/006-domain-persistence.md),
 [007-cycle-as-container-and-bff.md](docs/architecture/007-cycle-as-container-and-bff.md),
 [008-weekly-volume-estimate.md](docs/architecture/008-weekly-volume-estimate.md),
 [009-exercise-variants.md](docs/architecture/009-exercise-variants.md),
 [011-progress-charts.md](docs/architecture/011-progress-charts.md),
-[012-every-exercise-has-a-variant.md](docs/architecture/012-every-exercise-has-a-variant.md) and
-[013-ai-affirmations.md](docs/architecture/013-ai-affirmations.md).
+[012-every-exercise-has-a-variant.md](docs/architecture/012-every-exercise-has-a-variant.md),
+[013-ai-affirmations.md](docs/architecture/013-ai-affirmations.md) (superseded),
+[014-scheduled-jobs.md](docs/architecture/014-scheduled-jobs.md) and
+[015-weekly-affirmation-categories.md](docs/architecture/015-weekly-affirmation-categories.md).
 
 Deployment is continuous: `.github/workflows/deploy.yml` runs the gate, the remote D1 migrations
-and the OpenNext build and deploy on every push to `main`. Merging is deploying. There is no local
+and the OpenNext build and deploy, then deploys the jobs Worker, on every push to `main`. Merging
+is deploying. There is no local
 deploy script, because OpenNext bundles every `.env*` file into the Worker. See
 [005-continuous-deployment.md](docs/architecture/005-continuous-deployment.md). Every pull request
 into `main` runs `.github/workflows/check.yml`, the same gate with the storage tests on Miniflare's
@@ -93,7 +100,7 @@ in CI. Those are created when they have a real occupant, not before.
 
 ## Commands
 
-    pwsh -NoProfile -File scripts/check.ps1        # format + lint + typecheck + unit tests
+    pwsh -NoProfile -File scripts/check.ps1        # format + lint + typecheck + jobs bundle + unit tests
     pwsh -NoProfile -File scripts/check.ps1 -Fix   # fix what can be fixed, then report
 
 Exit codes: `0` passed or nothing to check, `1` issues found, `2` the check could not run.
