@@ -137,5 +137,6 @@ A bad week costs at most 3 requests a day.
   one deploy, and a separate deploy then took them out of the schema while they stayed in the
   database. CI applies migrations before the new app Worker is live, and the old app's Drizzle
   queries name every column. Dropping them in 0013 would have broken every session page for the
-  length of the deploy, and for longer if the deploy step failed. A follow-up migration drops them
-  once the schema without them is live in production.
+  length of the deploy, and for longer if the deploy step failed. Migration 0014 dropped them once
+  the schema without them was live in production. The same order holds for a rollback: reverting
+  the schema change after 0014 would break every session page.

@@ -99,6 +99,13 @@
       "when": 1792844555573,
       "tag": "0013_affirmation_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1792873746975,
+      "tag": "0014_drop_session_affirmation_columns",
+      "breakpoints": true
     }
   ]
 }
