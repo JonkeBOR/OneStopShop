@@ -1,0 +1,20 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "onestopshop-jobs",
+  "account_id": "2c9deedd46d8135271fef57c6854e55c",
+  "main": "worker.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "triggers": { "crons": ["0 3 * * *"] },
+  "alias": { "server-only": "../node_modules/server-only/empty.js" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "onestopshop",
+      "database_id": "0bb2542d-a2e1-48da-9530-1aaafcea0fe7",
+    },
+  ],
+  "vars": { "GEMINI_ENABLED": "true" },
+}

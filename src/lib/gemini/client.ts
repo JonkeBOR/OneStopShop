@@ -32,9 +32,9 @@ const safetySettings = [
 
 type JsonObject = Record<string, unknown>;
 
-type Environment = Readonly<Record<string, string | undefined>>;
+type GeminiEnvironment = { readonly GEMINI_API_KEY?: string; readonly GEMINI_ENABLED?: string };
 
-export function readGeminiConfig(env: Environment): GeminiConfig | null {
+export function readGeminiConfig(env: GeminiEnvironment): GeminiConfig | null {
   const isEnabled = env.GEMINI_ENABLED?.trim() === 'true';
   const apiKey = env.GEMINI_API_KEY?.trim();
   return isEnabled && apiKey ? { apiKey } : null;

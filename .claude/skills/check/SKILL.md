@@ -1,6 +1,6 @@
 ---
 name: 'check'
-description: 'Run OneStopShop quality gate - Prettier, ESLint, tsc and Vitest - through the scripts in scripts/, and interpret their switches, output and exit codes. Use before finishing any code change, or when asked to lint, format, typecheck or run the checks.'
+description: 'Run OneStopShop quality gate - Prettier, ESLint, tsc, the jobs Worker bundle and Vitest - through the scripts in scripts/, and interpret their switches, output and exit codes. Use before finishing any code change, or when asked to lint, format, typecheck or run the checks.'
 argument-hint: 'Optional: fix'
 user-invocable: true
 disable-model-invocation: false
@@ -8,7 +8,7 @@ disable-model-invocation: false
 
 # The quality gate
 
-    pwsh -NoProfile -File scripts/check.ps1        # format + lint + typecheck + unit tests
+    pwsh -NoProfile -File scripts/check.ps1        # format + lint + typecheck + jobs bundle + unit tests
     pwsh -NoProfile -File scripts/check.ps1 -Fix   # fix what can be fixed, then report
 
 **Every code change finishes with `check.ps1` exiting 0.**
@@ -18,6 +18,7 @@ The individual stages exist for narrower runs:
     pwsh -NoProfile -File scripts/format.ps1 -Write
     pwsh -NoProfile -File scripts/lint.ps1
     pwsh -NoProfile -File scripts/typecheck.ps1
+    pwsh -NoProfile -File scripts/jobs-bundle.ps1  # the jobs Worker bundles without Next-only code
     pwsh -NoProfile -File scripts/test.ps1
     pwsh -NoProfile -File scripts/e2e.ps1          # not part of check.ps1
     pwsh -NoProfile -File scripts/bundle.ps1       # not part of check.ps1: Worker size and startup
@@ -33,6 +34,7 @@ than loading whole configs and stack traces into context.
 | Prettier               | All formatting; ESLint never fights it (`eslint-config-prettier` runs last) |
 | ESLint 9 (flat config) | Correctness and convention rules, including the `docs/01` rules             |
 | TypeScript             | Type checking via `tsc --noEmit`; the app is never built by these scripts   |
+| Wrangler               | `jobs-bundle.ps1`: a dry-run deploy of the jobs Worker in `jobs/`           |
 | Vitest                 | Unit tests (node and jsdom projects) and storage tests against local D1     |
 | Playwright             | End-to-end tests in mobile WebKit against a real dev server                 |
 
@@ -71,7 +73,13 @@ Branch on the exit code rather than parsing the text.
       src/app/page.tsx:2:15 error react/forbid-dom-props Prop "style" is forbidden on DOM Nodes
       src/app/page.tsx:2:40 error react/jsx-no-literals Strings not allowed in JSX files: "Hello"
     TYPECHECK: PASS  errors=0
+    JOBS-BUNDLE: PASS  size=199.62KiB
     TEST: PASS  tests=1 passed=1 failed=0
+
+`jobs-bundle.ps1` bundles `jobs/wrangler.jsonc` with `wrangler deploy --dry-run`, uploads nothing,
+and reads esbuild's metafile. It fails with exit 1 when the bundle fails, or when any input comes
+from `@opennextjs` or `next`, listing those modules. A dry run alone never catches them: an
+OpenNext import bundles fine and only throws at run time in the jobs Worker.
 
 `SKIP` comes from `typecheck.ps1` when the repository contains no TypeScript at all, from
 `test.ps1` when no test file matches, and from `e2e.ps1` when no spec file matches. `test.ps1`

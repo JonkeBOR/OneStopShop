@@ -13,7 +13,6 @@ export async function runWeeklyAffirmations(
   sleep: Sleep,
 ): Promise<WeeklyAffirmationsOutcome> {
   if (generate === null) {
-    console.info('Weekly affirmations: disabled');
     return 'disabled';
   }
   const generatedAt = await readAffirmationSetGeneratedAt(db);
