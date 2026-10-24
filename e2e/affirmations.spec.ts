@@ -1,9 +1,26 @@
 import { expect, test, type Page } from '@playwright/test';
 import { fitnessStrings } from '@/lib/strings/fitness';
-import { clearAffirmations, seedAffirmations, seededSet } from './affirmations';
+import {
+  clearAffirmations,
+  replaceAffirmations,
+  seedAffirmations,
+  seededSet,
+  storedAffirmations,
+  type StoredAffirmation,
+} from './affirmations';
 import { signIn } from './session';
 
 test.describe.configure({ mode: 'serial' });
+
+let affirmationsBeforeTheRun: StoredAffirmation[] = [];
+
+test.beforeAll(() => {
+  affirmationsBeforeTheRun = storedAffirmations();
+});
+
+test.afterAll(() => {
+  replaceAffirmations(affirmationsBeforeTheRun);
+});
 
 async function startOnlyWorkout(page: Page, run: string): Promise<void> {
   const programName = `Affirmations ${run}`;
