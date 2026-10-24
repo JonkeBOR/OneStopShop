@@ -84,13 +84,13 @@ describe('writeAffirmationSet', () => {
     });
   });
 
-  it('sends a 60 s timeout and 4096 output tokens', async () => {
+  it('sends a 180 s timeout and 4096 output tokens', async () => {
     const generate = vi.fn<GenerateJson>().mockResolvedValue(answer(fullSet()));
 
     await writeAffirmationSet(generate, sleep);
 
     expect(generate.mock.calls[0]?.[0]).toMatchObject({
-      timeoutMilliseconds: 60_000,
+      timeoutMilliseconds: 180_000,
       maxOutputTokens: 4096,
     });
   });
@@ -103,17 +103,26 @@ describe('writeAffirmationSet', () => {
     expect(sleep).not.toHaveBeenCalled();
   });
 
-  it('retries a timeout, a 503 and a 429, waiting 30 s, 60 s and 120 s', async () => {
+  it('retries a timeout and a 503, waiting 30 s and 60 s', async () => {
     const generate = vi
       .fn<GenerateJson>()
       .mockResolvedValueOnce(failure('timeout', true))
       .mockResolvedValueOnce(failure('status 503', true))
+      .mockResolvedValueOnce(answer(fullSet()));
+
+    expect(await writeAffirmationSet(generate, sleep)).toEqual(fullSet());
+    expect(generate).toHaveBeenCalledTimes(3);
+    expect(sleep.mock.calls).toEqual([[30_000], [60_000]]);
+  });
+
+  it('retries a 429', async () => {
+    const generate = vi
+      .fn<GenerateJson>()
       .mockResolvedValueOnce(failure('status 429', true))
       .mockResolvedValueOnce(answer(fullSet()));
 
     expect(await writeAffirmationSet(generate, sleep)).toEqual(fullSet());
-    expect(generate).toHaveBeenCalledTimes(4);
-    expect(sleep.mock.calls).toEqual([[30_000], [60_000], [120_000]]);
+    expect(generate).toHaveBeenCalledTimes(2);
   });
 
   it('retries an incomplete set', async () => {
@@ -142,12 +151,12 @@ describe('writeAffirmationSet', () => {
     expect(generate).toHaveBeenCalledTimes(1);
   });
 
-  it('gives up after 4 attempts', async () => {
+  it('gives up after 3 attempts', async () => {
     const generate = vi.fn<GenerateJson>().mockResolvedValue(answer(fullSet(3)));
 
     expect(await writeAffirmationSet(generate, sleep)).toBeNull();
-    expect(generate).toHaveBeenCalledTimes(4);
-    expect(sleep).toHaveBeenCalledTimes(3);
+    expect(generate).toHaveBeenCalledTimes(3);
+    expect(sleep).toHaveBeenCalledTimes(2);
     expect(warn).toHaveBeenCalledWith('Affirmation set failed: invalid set');
   });
 });

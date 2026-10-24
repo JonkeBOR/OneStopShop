@@ -78,9 +78,9 @@ Reply as JSON with one array of strings per category id.`;
 
 export const affirmationUserMessage = "Write this week's set.";
 
-const attempts = 4;
-const backoffMilliseconds = [30_000, 60_000, 120_000];
-const timeoutMilliseconds = 60_000;
+const attempts = 3;
+const backoffMilliseconds = [30_000, 60_000];
+const timeoutMilliseconds = 180_000;
 const maxOutputTokens = 4096;
 
 export function affirmationResponseSchema(): GeminiSchema {

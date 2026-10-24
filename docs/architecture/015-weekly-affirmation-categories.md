@@ -97,8 +97,11 @@ and example lines, and these rules:
 
 ### Retries and the daily safety net
 
-Each attempt has a 60 s timeout and 4096 output tokens. A run makes up to 4 attempts, with backoff
-of 30 s, 60 s and 120 s, about 7.5 minutes at worst, inside the 15-minute limit.
+Each attempt has a 180 s timeout and 4096 output tokens. A run makes up to 3 attempts, with backoff
+of 30 s and 60 s, about 10.5 minutes at worst, inside the 15-minute limit. The timeout started at
+60 s, but a live local run on 2026-10-24 timed out on every attempt, and a success observed while
+building 013 took about 145 s on Google's side. A fourth 180 s attempt would not fit in the
+15 minutes.
 
 | Outcome | Retry within the run? |
 | --- | --- |
@@ -107,7 +110,7 @@ of 30 s, 60 s and 120 s, about 7.5 minutes at worst, inside the 15-minute limit.
 | An answer with an invalid or incomplete set, or an unexpected finish such as `MAX_TOKENS` | Yes |
 | HTTP 400, 401, 403, 404, a blocked prompt, a safety finish | No. Give up until tomorrow's run |
 
-A bad week costs at most 4 requests a day.
+A bad week costs at most 3 requests a day.
 
 ### Free tier and key rules, carried over from 013
 
