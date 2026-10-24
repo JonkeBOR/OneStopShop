@@ -15,7 +15,6 @@ export default defineConfig({
     command: 'npm run dev',
     url: baseURL,
     reuseExistingServer: true,
-    env: { GEMINI_API_KEY: '' },
     timeout: 120_000,
   },
 });

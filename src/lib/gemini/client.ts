@@ -1,5 +1,4 @@
-import 'server-only';
-import { getGeminiConfig, type GeminiConfig } from './config';
+export type GeminiConfig = { apiKey: string };
 
 export type GeminiSchema = {
   type: 'OBJECT' | 'ARRAY' | 'STRING' | 'NUMBER' | 'INTEGER' | 'BOOLEAN';
@@ -12,20 +11,34 @@ export type GeminiRequest = {
   systemInstruction: string;
   userMessage: string;
   responseSchema: GeminiSchema;
+  timeoutMilliseconds: number;
+  maxOutputTokens: number;
 };
 
-export type GenerateJson = (request: GeminiRequest) => Promise<unknown>;
+export type GeminiOutcome =
+  { ok: true; value: unknown } | { ok: false; reason: string; retryable: boolean };
+
+export type GenerateJson = (request: GeminiRequest) => Promise<GeminiOutcome>;
 
 const model = 'gemini-3.8-flash';
 const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-const timeoutMilliseconds = 4000;
-const maxOutputTokens = 256;
+const tooManyRequests = 429;
+const firstServerError = 500;
+const blockingFinishes = new Set(['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII']);
 const safetySettings = [
   { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
   { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
 ];
 
 type JsonObject = Record<string, unknown>;
+
+type Environment = Readonly<Record<string, string | undefined>>;
+
+export function readGeminiConfig(env: Environment): GeminiConfig | null {
+  const isEnabled = env.GEMINI_ENABLED?.trim() === 'true';
+  const apiKey = env.GEMINI_API_KEY?.trim();
+  return isEnabled && apiKey ? { apiKey } : null;
+}
 
 function isRecord(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null;
@@ -53,31 +66,36 @@ function answerText(candidate: JsonObject): string | null {
     .join('');
 }
 
-function warn(kind: string): null {
-  console.warn(`Gemini request failed: ${kind}`);
-  return null;
+function failure(reason: string, retryable: boolean): GeminiOutcome {
+  console.warn(`Gemini request failed: ${reason}`);
+  return { ok: false, reason, retryable };
 }
 
-function readAnswer(body: unknown): unknown {
+function isRetryableStatus(status: number): boolean {
+  return status === tooManyRequests || status >= firstServerError;
+}
+
+function readAnswer(body: unknown): GeminiOutcome {
   if (!isRecord(body)) {
-    return warn('invalid response');
+    return failure('invalid response', true);
   }
   const { promptFeedback } = body;
   if (isRecord(promptFeedback) && promptFeedback.blockReason) {
-    return warn('blocked');
+    return failure('blocked', false);
   }
   const candidate = firstCandidate(body);
   if (!candidate) {
-    return warn('no candidates');
+    return failure('no candidates', true);
   }
   if (candidate.finishReason !== 'STOP') {
-    return warn(`finish ${String(candidate.finishReason)}`);
+    const finishReason = String(candidate.finishReason);
+    return failure(`finish ${finishReason}`, !blockingFinishes.has(finishReason));
   }
   const text = answerText(candidate);
   if (text === null) {
-    return warn('invalid response');
+    return failure('invalid response', true);
   }
-  return JSON.parse(text) as unknown;
+  return { ok: true, value: JSON.parse(text) as unknown };
 }
 
 function failureKind(error: unknown): string {
@@ -94,7 +112,7 @@ export async function generateJson(
   config: GeminiConfig,
   request: GeminiRequest,
   fetchFn: typeof fetch = fetch,
-): Promise<unknown> {
+): Promise<GeminiOutcome> {
   try {
     const response = await fetchFn(endpoint, {
       method: 'POST',
@@ -106,29 +124,25 @@ export async function generateJson(
         systemInstruction: { parts: [{ text: request.systemInstruction }] },
         contents: [{ role: 'user', parts: [{ text: request.userMessage }] }],
         generationConfig: {
-          maxOutputTokens,
+          maxOutputTokens: request.maxOutputTokens,
           responseMimeType: 'application/json',
           responseSchema: request.responseSchema,
           thinkingConfig: { thinkingLevel: 'low' },
         },
         safetySettings,
       }),
-      signal: AbortSignal.timeout(timeoutMilliseconds),
+      signal: AbortSignal.timeout(request.timeoutMilliseconds),
     });
     if (!response.ok) {
       void response.body?.cancel().catch(() => undefined);
-      return warn(`status ${response.status}`);
+      return failure(`status ${response.status}`, isRetryableStatus(response.status));
     }
     return readAnswer((await response.json()) as unknown);
   } catch (error) {
-    return warn(failureKind(error));
+    return failure(failureKind(error), true);
   }
 }
 
-export function getGeminiGenerator(): GenerateJson | null {
-  const config = getGeminiConfig();
-  if (!config) {
-    return null;
-  }
-  return (request) => generateJson(config, request);
+export function geminiGenerator(config: GeminiConfig, fetchFn: typeof fetch = fetch): GenerateJson {
+  return (request) => generateJson(config, request, fetchFn);
 }
