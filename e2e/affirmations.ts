@@ -1,29 +1,17 @@
 import { execFileSync } from 'node:child_process';
+import {
+  affirmationCategories,
+  type AffirmationCategory,
+} from '@/features/fitness-tracker/domain/affirmation';
 
-type Category =
-  | 'skipped-whole-workout'
-  | 'skipped-whole-exercise'
-  | 'skipped-sets'
-  | 'fully-completed'
-  | 'fully-completed-with-improvements'
-  | 'fully-completed-with-improvements-on-every-exercise';
+type SeededSet = Readonly<Record<AffirmationCategory, readonly string[]>>;
 
-type SeededSet = Readonly<Record<Category, readonly string[]>>;
-
-function seededLines(category: Category): string[] {
-  return Array.from({ length: 7 }, (_, position) => `Seeded ${category} ${position}`);
-}
-
-export const seededSet: SeededSet = {
-  'skipped-whole-workout': seededLines('skipped-whole-workout'),
-  'skipped-whole-exercise': seededLines('skipped-whole-exercise'),
-  'skipped-sets': seededLines('skipped-sets'),
-  'fully-completed': seededLines('fully-completed'),
-  'fully-completed-with-improvements': seededLines('fully-completed-with-improvements'),
-  'fully-completed-with-improvements-on-every-exercise': seededLines(
-    'fully-completed-with-improvements-on-every-exercise',
-  ),
-};
+export const seededSet: SeededSet = Object.fromEntries(
+  affirmationCategories.map((category) => [
+    category,
+    Array.from({ length: 7 }, (_, position) => `Seeded ${category} ${position}`),
+  ]),
+) as Record<AffirmationCategory, string[]>;
 
 function executeLocally(command: string): void {
   execFileSync(

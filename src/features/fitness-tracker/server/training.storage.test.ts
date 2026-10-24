@@ -13,6 +13,7 @@ import {
   type ProgramSpec,
 } from './storage-test-support';
 import {
+  countEarlierSessionsThisWeek,
   finishWorkout,
   getSession,
   getSessionSlotSettings,
@@ -673,5 +674,106 @@ describe('training', () => {
       const [updated] = await db.select().from(plannedSets).where(eq(plannedSets.id, target));
       expect(updated?.lastWeightGrams).toBe(30000);
     });
+  });
+});
+
+describe('sessions finished earlier in the week', () => {
+  let testDatabase: TestDatabase;
+  let profileId: string;
+  let program: Program;
+
+  const eightWorkouts: ProgramSpec = {
+    blockCount: 1,
+    workouts: Array.from({ length: 8 }, (_, index) => ({
+      name: `Day ${index + 1}`,
+      slots: [{ exercise: 'Press', targetReps: [5] }],
+    })),
+  };
+
+  beforeAll(async () => {
+    testDatabase = await openTestDatabase();
+  });
+
+  afterAll(async () => {
+    await testDatabase.dispose();
+  });
+
+  async function activeProgramFor(profile: string): Promise<Program> {
+    const { db } = testDatabase;
+    const created = await createProgramFromSpec(
+      db,
+      profile,
+      eightWorkouts,
+      new Date('2026-10-01T08:00:00Z'),
+    );
+    expectOk(await activateProgram(db, profile, created.id, new Date('2026-10-01T08:00:00Z')));
+    return created;
+  }
+
+  beforeEach(async () => {
+    profileId = (
+      await ensureProfile(testDatabase.db, crypto.randomUUID(), new Date('2026-10-01T08:00:00Z'))
+    ).id;
+    program = await activeProgramFor(profileId);
+  });
+
+  async function train(
+    index: number,
+    finishedAt: string,
+    options: { finish?: boolean; profile?: string; workouts?: Program } = {},
+  ): Promise<string> {
+    const { db } = testDatabase;
+    const profile = options.profile ?? profileId;
+    const workoutId = (options.workouts ?? program).workouts[index]?.id ?? '';
+    const finished = new Date(finishedAt);
+    const session = expectOk(
+      await startWorkout(db, profile, workoutId, new Date(finished.getTime() - 3_600_000)),
+    );
+    if (options.finish ?? true) {
+      expectOk(await finishWorkout(db, profile, session.id, finished));
+    }
+    return session.id;
+  }
+
+  async function countFor(sessionId: string): Promise<number> {
+    const { db } = testDatabase;
+    const session = expectOk(await getSession(db, profileId, sessionId));
+    return countEarlierSessionsThisWeek(db, profileId, session);
+  }
+
+  it('counts the sessions finished earlier in the same week', async () => {
+    await train(0, '2026-10-19T09:00:00Z');
+    await train(1, '2026-10-20T09:00:00Z');
+    await train(2, '2026-10-21T09:00:00Z');
+    const current = await train(3, '2026-10-22T09:00:00Z');
+
+    expect(await countFor(current)).toBe(3);
+  });
+
+  it('does not count sessions from last week', async () => {
+    await train(0, '2026-10-18T23:59:00Z');
+    const current = await train(1, '2026-10-19T00:30:00Z');
+
+    expect(await countFor(current)).toBe(0);
+  });
+
+  it('does not count sessions finished later, so a reload keeps its position', async () => {
+    await train(0, '2026-10-19T09:00:00Z');
+    const current = await train(1, '2026-10-20T09:00:00Z');
+    await train(2, '2026-10-21T09:00:00Z');
+
+    expect(await countFor(current)).toBe(1);
+  });
+
+  it('does not count unfinished sessions or other profiles', async () => {
+    const otherProfileId = (
+      await ensureProfile(testDatabase.db, crypto.randomUUID(), new Date('2026-10-01T08:00:00Z'))
+    ).id;
+    const otherProgram = await activeProgramFor(otherProfileId);
+    await train(0, '2026-10-19T09:00:00Z', { profile: otherProfileId, workouts: otherProgram });
+    await train(1, '2026-10-20T09:00:00Z', { finish: false });
+    const current = await train(2, '2026-10-21T09:00:00Z');
+
+    expect(await countFor(current)).toBe(0);
   });
 });

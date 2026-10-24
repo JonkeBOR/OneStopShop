@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { parseCompletedBlock } from '@/features/fitness-tracker/domain/values';
+import { finishedSessionAffirmation } from '@/features/fitness-tracker/server/affirmations';
 import { requireFitnessContext } from '@/features/fitness-tracker/server/page-context';
 import { readTimeZone } from '@/features/fitness-tracker/server/time-zone';
 import { getSession, getTrainingOverview } from '@/features/fitness-tracker/server/training';
@@ -39,7 +40,9 @@ export default async function WorkoutFinishedPage({
   const completedBlock = parseCompletedBlock(completed);
   return (
     <WorkoutFinishedScreen
-      affirmation={randomAffirmation()}
+      affirmation={
+        (await finishedSessionAffirmation(db, profileId, session.value)) ?? randomAffirmation()
+      }
       workoutName={session.value.workout.name}
       overview={overview}
       completedBlock={completedBlock}

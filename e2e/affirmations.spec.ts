@@ -36,7 +36,9 @@ async function startOnlyWorkout(page: Page, run: string): Promise<void> {
 
   await page.goto('/fitness-tracker');
   await page.getByRole('link', { name: new RegExp(programName) }).click();
+  await expect(page).toHaveURL('/fitness-tracker/active');
   await page.getByRole('link', { name: new RegExp(fitnessStrings.block.name(1)) }).click();
+  await expect(page).toHaveURL('/fitness-tracker/active/block');
   await page.getByRole('button', { name: new RegExp(workoutName) }).click();
   await expect(
     page.getByRole('heading', { level: 1, name: new RegExp(workoutName) }),
@@ -84,7 +86,9 @@ test('a session finished with no sets logged shows a skipped-whole-workout affir
   await startOnlyWorkout(page, Date.now().toString(36));
 
   await page.getByRole('button', { name: fitnessStrings.session.finishWorkout }).click();
-  await page.getByRole('button', { name: fitnessStrings.session.finishEmptyConfirmLabel }).click();
+  await page
+    .getByRole('button', { name: fitnessStrings.session.finishEmptyConfirmLabel, exact: true })
+    .click();
 
   expect(seededSet['skipped-whole-workout']).toContain(await finishedAffirmation(page));
 });
