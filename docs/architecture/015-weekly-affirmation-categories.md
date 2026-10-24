@@ -129,4 +129,9 @@ A bad week costs at most 4 requests a day.
 - The first production set arrives at the first daily run after the merge and after the jobs
   Worker's secret is set. Until then the page shows fixed lines.
 - Every user sees the same 42 lines in a week. The category and the week position decide which one.
-- The per-session affirmations stored by 013 were dropped with their columns in migration 0013.
+- Migration 0013 only adds the `affirmations` table. The 013 columns
+  `workout_sessions.affirmation` and `affirmation_requested_at` stay in the schema, unread, for one
+  deploy. CI applies migrations before the new app Worker is live, and the old app's Drizzle
+  queries name every column. Dropping them in 0013 would have broken every session page for the
+  length of the deploy, and for longer if the deploy step failed. A follow-up migration drops them
+  once this decision is live in production.

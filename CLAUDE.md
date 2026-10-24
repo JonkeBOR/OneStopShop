@@ -42,7 +42,7 @@ the fitness tracker at `/fitness-tracker` is the app's first feature. `wrangler.
 and the D1 binding. See
 [004-hosting-and-persistence.md](docs/architecture/004-hosting-and-persistence.md).
 
-The fitness tracker is built end to end. The domain is Drizzle ORM with a fifteen-table schema in
+The fitness tracker is built end to end. The domain is Drizzle ORM with a sixteen-table schema in
 `src/features/fitness-tracker/server/schema.ts`, migrations generated into `migrations/`, pure rules
 in `src/features/fitness-tracker/domain/`, and server-only operations in
 `src/features/fitness-tracker/server/` that take a `Database` from `src/lib/server/database.ts` as

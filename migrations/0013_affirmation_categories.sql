@@ -6,6 +6,4 @@ CREATE TABLE `affirmations` (
 	`generated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `affirmations_category_position` ON `affirmations` (`category`,`position`);--> statement-breakpoint
-ALTER TABLE `workout_sessions` DROP COLUMN `affirmation`;--> statement-breakpoint
-ALTER TABLE `workout_sessions` DROP COLUMN `affirmation_requested_at`;
+CREATE UNIQUE INDEX `affirmations_category_position` ON `affirmations` (`category`,`position`);

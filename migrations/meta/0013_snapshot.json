@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "9f963a66-7521-4202-b0fd-b7fd6080337a",
+  "id": "e8465bb7-9ad7-4269-8fce-03b8c6ee658e",
   "prevId": "6919dafd-9cc8-4579-a7af-ec88d49abadf",
   "tables": {
     "affirmations": {
@@ -1098,6 +1098,20 @@
         },
         "finished_at": {
           "name": "finished_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "affirmation": {
+          "name": "affirmation",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "affirmation_requested_at": {
+          "name": "affirmation_requested_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,

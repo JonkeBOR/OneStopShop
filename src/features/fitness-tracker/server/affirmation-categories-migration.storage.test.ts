@@ -53,13 +53,23 @@ describe('affirmation categories migration', () => {
     await dispose();
   });
 
-  it('drops both affirmation columns from workout_sessions', async () => {
+  it('keeps both per-session affirmation columns, so the app still on main works while this deploys', async () => {
     const columns = await db.all<{ name: string }>(sql`PRAGMA table_info(workout_sessions)`);
     const names = columns.map((column) => column.name);
 
-    expect(names).toContain('finished_at');
-    expect(names).not.toContain('affirmation');
-    expect(names).not.toContain('affirmation_requested_at');
+    expect(names).toContain('affirmation');
+    expect(names).toContain('affirmation_requested_at');
+  });
+
+  it('can still store a session the way the app on main does', async () => {
+    await db.run(
+      sql`INSERT INTO workout_sessions (id, profile_id, program_id, cycle_id, pass, training_block_id, workout_id, status, started_at, finished_at, affirmation, affirmation_requested_at) VALUES ('ses-2', 'pr', 'prog', 'cy', 2, 'block', 'wo', 'in_progress', 30, NULL, NULL, NULL)`,
+    );
+
+    expect(
+      await db.all<{ id: string }>(sql`SELECT id FROM workout_sessions WHERE id = 'ses-2'`),
+    ).toEqual([{ id: 'ses-2' }]);
+    await db.run(sql`DELETE FROM workout_sessions WHERE id = 'ses-2'`);
   });
 
   it('keeps the existing sessions', async () => {
